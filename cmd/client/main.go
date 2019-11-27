@@ -1,34 +1,32 @@
 package main
 
 import (
-    "fmt"
-    "flag"
-    "math/big"
+	"flag"
+	"fmt"
 
-    "github.com/katzenpost/client"
+	"github.com/hashcloak/Meson/common"
+	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
-	"github.com/HashCloak/Meson/common"
-	"github.com/ugorji/go/codec"
 )
 
 func main() {
-    cfgFile := flag.String("c", "katzenpost.toml", "Path to the server config file")
-    ticker := flag.String("t", "", "Ticker")
-    chainID := flag.Int("chain", 1, "Chain ID for specific ETH-based chain")
-    service := flag.String("s", "", "Service Name")
-    rawTransactionBlob := flag.String("rt", "", "Raw Transaction blob to send over the network")
-    flag.parse()
+	cfgFile := flag.String("c", "katzenpost.toml", "Path to the server config file")
+	ticker := flag.String("t", "", "Ticker")
+	chainID := flag.Int("chain", 1, "Chain ID for specific ETH-based chain")
+	service := flag.String("s", "", "Service Name")
+	rawTransactionBlob := flag.String("rt", "", "Raw Transaction blob to send over the network")
+	flag.Parse()
 
-    if *rawTransactionBlob == "" {
-        panic("must specify a transaction blob in hex")
-    }
+	if *rawTransactionBlob == "" {
+		panic("must specify a transaction blob in hex")
+	}
 
-    cfg, err = config.LoadFile(*cfgFile)
-    if err != nil {
-        panic(err)
-    }
+	cfg, err := config.LoadFile(*cfgFile)
+	if err != nil {
+		panic(err)
+	}
 
-    cfg, linkKey := client.AutoRegisterRandomClient(cfg)
+	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
 	c, err := client.New(cfg)
 	if err != nil {
 		panic(err)
