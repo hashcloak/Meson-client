@@ -15,13 +15,13 @@ func main() {
 	chainID := flag.Int("chain", 1, "Chain ID for specific ETH-based chain")
 	service := flag.String("s", "", "Service Name")
 	rawTransactionBlob := flag.String("rt", "", "Raw Transaction blob to send over the network")
-	flag.parse()
+	flag.Parse()
 
 	if *rawTransactionBlob == "" {
 		panic("must specify a transaction blob in hex")
 	}
 
-	cfg, err = config.LoadFile(*cfgFile)
+	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
 		panic(err)
 	}
