@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/hashcloak/Meson/common"
 	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
@@ -15,11 +17,22 @@ func main() {
 	chainID := flag.Int("chain", 1, "Chain ID for specific ETH-based chain")
 	service := flag.String("s", "", "Service Name")
 	rawTransactionBlob := flag.String("rt", "", "Raw Transaction blob to send over the network")
+	privKey := flag.String("pk", "", "Private key used to sign the txn")
 	flag.Parse()
 
 	if *rawTransactionBlob == "" {
-		panic("must specify a transaction blob in hex")
+		if *privKey == "" {
+			panic("must specify a transaction blob in hex or a private key to sign a txn")
+		}
 	}
+
+	key, err := crypto.HexToECDSA(*privKey)
+	if err != nil {
+		panic(err)
+	}
+
+	pubKey := crypto.PubkeyToAddress(key.PublicKey)
+	fmt.Printf("Using address: \n0x%v\n", hex.EncodeToString(pubKey.Bytes()))
 
 	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
