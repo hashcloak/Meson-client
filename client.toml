@@ -4,9 +4,7 @@
   File = ""
 
 [UpstreamProxy]
-  Type = "tor+socks5"
-  Address = "172.28.1.3:59484"
-  Network = "tcp"
+  Type = "none"
 
 [Debug]
   DisableDecoyTraffic = true
