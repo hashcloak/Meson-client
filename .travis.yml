@@ -7,3 +7,7 @@ go:
 
 script:
   - if [ -n "$(gofmt -l .)" ]; then echo "Go code is not formatted:"; gofmt -d .; exit 1; fi
+  - go build cmd/client/main.go
+cache:
+  directories:
+    - $GOPATH/pkg/mod
