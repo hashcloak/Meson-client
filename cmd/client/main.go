@@ -1,12 +1,11 @@
 package main
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/hashcloak/Meson/common"
+	"github.com/hashcloak/Meson-client/pkg/gentxn"
+	"github.com/hashcloak/Meson/plugin/pkg/common"
 	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
 )
@@ -26,14 +25,6 @@ func main() {
 		}
 	}
 
-	key, err := crypto.HexToECDSA(*privKey)
-	if err != nil {
-		panic(err)
-	}
-
-	pubKey := crypto.PubkeyToAddress(key.PublicKey)
-	fmt.Printf("Using address: \n0x%v\n", hex.EncodeToString(pubKey.Bytes()))
-
 	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
 		panic(err)
@@ -50,8 +41,13 @@ func main() {
 		panic(err)
 	}
 
+	raw := *rawTransactionBlob
+	if *privKey != "" {
+		raw = gentxn.GenerateRawTxn(privKey, "http://localhost:19545")
+	}
+
 	// serialize our transaction inside a eth kaetzpost request message
-	req := common.NewRequest(*ticker, *rawTransactionBlob, *chainID)
+	req := common.NewRequest(*ticker, raw, *chainID)
 	mesonRequest := req.ToJson()
 
 	mesonService, err := session.GetService(*service)
