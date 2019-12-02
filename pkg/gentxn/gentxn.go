@@ -7,48 +7,71 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"log"
 	"math/big"
 )
 
-// GenerateRawTxn just signs a txn with
-func GenerateRawTxn(pk *string, rpcEndpoint string) string {
+// Ethers basic ethereum node interface
+type Ethers struct {
+	ChainID   *big.Int
+	ethclient *ethclient.Client
+}
 
-	key, err := crypto.HexToECDSA(*pk)
-	if err != nil {
-		panic(err)
-	}
-
+// SetURLAndChainID init for ethers
+func SetURLAndChainID(rpcEndpoint string) (Ethers, error) {
 	ethclient, err := ethclient.Dial(rpcEndpoint)
-	// Note that this is not using the mixnet to obtain the nonce value.
-	// This is just to facilitate testing the mixnet.
-	nonce, err := ethclient.PendingNonceAt(context.Background(), crypto.PubkeyToAddress(key.PublicKey))
 	if err != nil {
-		log.Fatal(err)
+		return Ethers{}, err
+	}
+	chainID, err := ethclient.ChainID(context.Background())
+	return Ethers{chainID, ethclient}, err
+}
+
+func (e *Ethers) obtainNonce(pubAddress common.Address) (uint64, error) {
+	nonce, err := e.ethclient.PendingNonceAt(context.Background(), pubAddress)
+	if err != nil {
+		return 0, err
+	}
+	return nonce, nil
+}
+
+func (e *Ethers) obtainGasPrice() (*big.Int, error) {
+	gasPrice, err := e.ethclient.SuggestGasPrice(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return gasPrice, nil
+}
+
+// GenerateSignedRawTxn just signs a txn with
+func (e *Ethers) GenerateSignedRawTxn(pk string) (*string, error) {
+
+	key, err := crypto.HexToECDSA(pk)
+	if err != nil {
+		return nil, err
 	}
 
-	value := big.NewInt(123)
-	gasLimit := uint64(21000)
-	gasPrice, err := ethclient.SuggestGasPrice(context.Background())
+	nonce, err := e.obtainNonce(crypto.PubkeyToAddress(key.PublicKey))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	toAddress := common.HexToAddress(crypto.PubkeyToAddress(key.PublicKey).Hex())
-	var data []byte
+	gasPrice, err := e.obtainGasPrice()
+	if err != nil {
+		return nil, err
+	}
+	to := common.HexToAddress(crypto.PubkeyToAddress(key.PublicKey).Hex())
 	tx := types.NewTransaction(
 		nonce,
-		toAddress,
-		value,
-		gasLimit, gasPrice, data)
+		to,
+		big.NewInt(123),
+		uint64(21000),
+		gasPrice,
+		[]byte(""),
+	)
 
-	chainID, err := ethclient.NetworkID(context.Background())
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(e.ChainID), key)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), key)
-
-	ts := types.Transactions{signedTx}
-	return hex.EncodeToString(ts.GetRlp(0))
+	txn := "0x" + hex.EncodeToString(types.Transactions{signedTx}.GetRlp(0))
+	return &txn, nil
 }

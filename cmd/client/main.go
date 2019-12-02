@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 
@@ -17,13 +18,8 @@ func main() {
 	service := flag.String("s", "", "Service Name")
 	rawTransactionBlob := flag.String("rt", "", "Raw Transaction blob to send over the network")
 	privKey := flag.String("pk", "", "Private key used to sign the txn")
+	rpcEndpoint := flag.String("rpc", "http://172.28.1.10:9545", "Ethereum rpc endpoint")
 	flag.Parse()
-
-	if *rawTransactionBlob == "" {
-		if *privKey == "" {
-			panic("must specify a transaction blob in hex or a private key to sign a txn")
-		}
-	}
 
 	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
@@ -41,13 +37,18 @@ func main() {
 		panic(err)
 	}
 
-	raw := *rawTransactionBlob
-	if *privKey != "" {
-		raw = gentxn.GenerateRawTxn(privKey, "http://localhost:19545")
+	if *rawTransactionBlob == "" {
+		if *privKey == "" {
+			panic("must specify a transaction blob in hex or a private key to sign a txn")
+		}
+		rawTransactionBlob, err = produceSignedRawTxn(privKey, rpcEndpoint, chainID)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	// serialize our transaction inside a eth kaetzpost request message
-	req := common.NewRequest(*ticker, raw, *chainID)
+	req := common.NewRequest(*ticker, *rawTransactionBlob, *chainID)
 	mesonRequest := req.ToJson()
 
 	mesonService, err := session.GetService(*service)
@@ -62,4 +63,17 @@ func main() {
 	fmt.Printf("reply: %s\n", reply)
 	fmt.Println("Done. Shutting down.")
 	c.Shutdown()
+}
+
+func produceSignedRawTxn(pk *string, rpcEndpoint *string, chainID *int) (*string, error) {
+	ethers, err := gentxn.SetURLAndChainID(*rpcEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	if ethers.ChainID.Int64() != int64(*chainID) {
+		return nil, errors.New("ChainIDs are not the same between rpcEndpoint and chainID flag")
+	}
+	rawTxn, err := ethers.GenerateSignedRawTxn(*pk)
+	return rawTxn, nil
 }
