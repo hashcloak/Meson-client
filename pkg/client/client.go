@@ -30,9 +30,10 @@ type Client struct {
 }
 
 
-func (c *Client) Start(cfg *config.Config) {
+func (c *Client) Start() {
 	// Retrieve PKI consensus documents and related info
 	cfg, linkKey := client.AutoRegisterRandomClient(c.cfg)
+	c.cfg = cfg
 	c.linkKey = linkKey
 	session, err := c.NewSession(c.linkKey)
 	if err != nil {
