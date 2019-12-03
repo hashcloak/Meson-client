@@ -1,8 +1,12 @@
 package client
 
 import (
-	"fmt"
 	"testing"
-	"github.com/katzenpost/client/config"
-
 )
+
+func TestHello(t *testing.T) {
+	got := Hello()
+	if got != "Hello" {
+		t.Errorf("Helo() = %s; want \"Hello\"", got)
+	}
+}
