@@ -1,17 +1,13 @@
 package client
 
 import (
-	"fmt"
-	"errors"
 	"sync"
-	"time"
 
-	"github.com/katzenpost/core/crypto/ecdh"
-	"github.com/katzenpost/core/crypto/rand"
+	"github.com/hashcloak/Meson/plugin/pkg/common"
 	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
+	"github.com/katzenpost/core/crypto/ecdh"
 	"github.com/katzenpost/core/log"
-	"github.com/hashcloak/Meson/plugin/pkg/common"
 	"gopkg.in/op/go-logging.v1"
 )
 
@@ -23,12 +19,10 @@ type Client struct {
 	fatalErrCh chan error
 	haltedCh   chan interface{}
 	haltOnce   *sync.Once
-
-	session 	*client.Session
-	linkKey		*ecdh.PrivateKey
-	service		string
+	session    *client.Session
+	linkKey    *ecdh.PrivateKey
+	service    string
 }
-
 
 func (c *Client) Start() {
 	// Retrieve PKI consensus documents and related info
@@ -61,7 +55,7 @@ func (c *Client) SendRawTransaction(rawTransactionBlob *string, chainID *int, ti
 	}
 
 	reply, err := c.session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
-	if err != nil { 
+	if err != nil {
 		return nil, err
 	}
 
@@ -71,12 +65,12 @@ func (c *Client) SendRawTransaction(rawTransactionBlob *string, chainID *int, ti
 // Creates a new Meson Client with the provided configuration
 func New(cfg *config.Config, service string) (*Client, error) {
 	client := &Client{
-		cfg: cfg,
+		cfg:        cfg,
 		fatalErrCh: make(chan error),
-		haltedCh:	make(chan interface{}),
-		haltOnce: new(sync.Once),
-		linkKey: new(ecdh.PrivateKey),
-		service: service,
+		haltedCh:   make(chan interface{}),
+		haltOnce:   new(sync.Once),
+		linkKey:    new(ecdh.PrivateKey),
+		service:    service,
 	}
 
 	return client, nil
