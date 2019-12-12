@@ -9,7 +9,7 @@ script:
   - if [ -n "$(gofmt -l .)" ]; then echo "Go code is not formatted:"; gofmt -d .; exit 1; fi
   - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson && make up
   - docker run --rm
-    -v `pwd`:/client
+    -v $TRAVIS_BUILD_DIR:/client
     --network nonvoting_testnet_nonvoting_test_net
     -v /tmp/gopath-pkg:/go/pkg
     -w /client
@@ -19,3 +19,4 @@ script:
 cache:
   directories:
     - $GOPATH/pkg/mod
+    - /tmp/gopath-pkg
