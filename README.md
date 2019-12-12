@@ -16,7 +16,7 @@ docker run --rm \
   /bin/bash -c "GORACE=history_size=7 go test -race"
 ```
 
-The above can be de-constructed as following:
+The above can be de-constructed as follows:
 - ```-v `pwd`:/client```: Mount the current directory inside the docker container at `/client`
 - `--network nonvoting_testnet_nonvoting_test_net`: Connect to the existing docker network mixnet
 - `-v /tmp/gopath-pkg:/go/pkg`: Cache the go modules that belong to this container in `/tmp/gopath-pkg`
