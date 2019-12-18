@@ -1,6 +1,7 @@
 # Meson-client
-A simple client for use with the Meson mixnet software
+[![Build Status](https://travis-ci.com/hashcloak/Meson-client.svg?branch=master)](https://travis-ci.com/hashcloak/Meson-client)
 
+A simple client for use with the Meson mixnet software
 
 ## Tests
 
