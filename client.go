@@ -1,3 +1,5 @@
+// Package client provides a thin-wrapper of the Katzenpost client library
+// for cryptocurrency transactions.
 package client
 
 import (
@@ -26,6 +28,10 @@ type Client struct {
 	service    string
 }
 
+// Start begins a Meson client.
+// The client retrieves PKI consensus documents in order to get a view of the network
+// and connect to a provider.
+// It returns an error if they were any issues starting the client.
 func (c *Client) Start() error {
 	var err error
 	// Retrieve PKI consensus documents and related info
@@ -34,9 +40,13 @@ func (c *Client) Start() error {
 	return err
 }
 
+// SendRawTransaction takes a signed transaction blob, a destination blockchain
+// along with its ticker symbol and sends that blob to a provider that will
+// send the blob to the right blockchain.
+// It returns a reply and any error encountered.
+
+// Note: This is subject to change as we add more support for other blockchains
 func (c *Client) SendRawTransaction(rawTransactionBlob *string, chainID *int, ticker *string) ([]byte, error) {
-	// Send a raw transaction blob to a provider
-	// Pretty much the same code that's in main.go
 	defer c.Shutdown()
 
 	req := common.NewRequest(*ticker, *rawTransactionBlob, *chainID)
@@ -55,6 +65,8 @@ func (c *Client) SendRawTransaction(rawTransactionBlob *string, chainID *int, ti
 	return reply, nil
 }
 
+// InitLogging provides logging for the meson client
+// It returns any errors it encounters.
 func (c *Client) InitLogging() error {
 	f := c.cfg.Logging.File
 	if !c.cfg.Logging.Disable && c.cfg.Logging.File != "" {
@@ -71,7 +83,9 @@ func (c *Client) InitLogging() error {
 	return err
 }
 
-// Creates a new Meson Client with the provided configuration
+// New instantiates a new Meson client with the provided configuration file
+// and service that represents the chain it's being used for.
+// It returns a Client struct pointer and any errors encountered.
 func New(cfgFile string, service string) (*Client, error) {
 	cfg, err := config.LoadFile(cfgFile)
 	if err != nil {
