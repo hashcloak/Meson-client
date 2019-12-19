@@ -28,7 +28,7 @@ type Client struct {
 	service    string
 }
 
-// Start begins a Meson client. 
+// Start begins a Meson client.
 // The client retrieves PKI consensus documents in order to get a view of the network
 // and connect to a provider.
 // It returns an error if they were any issues starting the client.
