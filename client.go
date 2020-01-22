@@ -4,7 +4,7 @@ package client
 
 import (
 	"errors"
-	"github.com/hashcloak/Meson/plugin/pkg/common"
+	"github.com/hashcloak/Meson-plugin/pkg/common"
 	katzenClient "github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
 	"github.com/katzenpost/core/crypto/ecdh"
