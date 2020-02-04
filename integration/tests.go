@@ -10,11 +10,17 @@ import (
 	"math/big"
 	"os"
 
+	sdk "github.com/binance-chain/go-sdk/client"
+	bnbTypes "github.com/binance-chain/go-sdk/common/types"
+	"github.com/binance-chain/go-sdk/keys"
+	"github.com/binance-chain/go-sdk/types/msg"
+	bnbTx "github.com/binance-chain/go-sdk/types/tx"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	tendermintCrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/hashcloak/Meson-plugin/pkg/common"
 	"github.com/katzenpost/client"
@@ -27,13 +33,21 @@ type TestSuit struct {
 	rpcURL            *string
 	ticker            *string
 	signedTransaction *string
-	transactionHash   *string
+	transactionHash   *[]byte
 }
 
 type MesonReply struct {
 	Message    string `json:"Message,omitempty"`
 	StatusCode uint   `json:"StatusCode"`
 	Version    uint   `json:"Version"`
+}
+
+func getCosmosAccountInfo(key keys.KeyManager) (*bnbTypes.BalanceAccount, error) {
+	clientSDK, err := sdk.NewDexClient("testnet-dex.binance.org", bnbTypes.TestNetwork, key)
+	if err != nil {
+		return nil, err
+	}
+	return clientSDK.GetAccount(key.GetAddr().String())
 }
 
 func getRPCUrl(currencyTomlPath string) *string {
@@ -70,9 +84,11 @@ func main() {
 	}
 
 	testSuit := &TestSuit{
-		pk:     privKey,
-		ticker: ticker,
-		rpcURL: getRPCUrl(""),
+		pk:                privKey,
+		ticker:            ticker,
+		rpcURL:            getRPCUrl(""),
+		signedTransaction: new(string),
+		transactionHash:   new([]byte),
 	}
 
 	if err := testSuit.produceSignedRawTxn(); err != nil {
@@ -108,13 +124,12 @@ func main() {
 	if err != nil {
 		panic("Unmarshal error: " + err.Error())
 	}
-	if err := testSuit.checkTransactionIsAccepted(); err != nil {
-		panic("No transaction: " + err.Error())
-	}
-	if mesonReply.Message == "success" {
-		fmt.Println("Messages are the same")
-	} else {
+	if mesonReply.Message != "success" {
+		fmt.Println("Message was not a success: ", mesonReply.Message)
 		os.Exit(-1)
+	}
+	if err := testSuit.checkTransactionIsAccepted(); err != nil {
+		panic("Transaction error: " + err.Error())
 	}
 	fmt.Println("Done. Shutting down.")
 	c.Shutdown()
@@ -124,10 +139,42 @@ func (s *TestSuit) produceSignedRawTxn() error {
 	var err error
 	switch *s.ticker {
 	case "tbnb":
-		err = s.signEthereumRawTxn()
+		err = s.signCosmosRawTxn()
 	case "gor":
 		err = s.signEthereumRawTxn()
 	}
+	return err
+}
+func (s *TestSuit) signCosmosRawTxn() error {
+	key, err := keys.NewPrivateKeyManager(*s.pk)
+	if err != nil {
+		return err
+	}
+	mess := []msg.Msg{
+		msg.CreateSendMsg(
+			key.GetAddr(),
+			bnbTypes.Coins{
+				bnbTypes.Coin{Denom: "BNB", Amount: 1},
+			},
+			[]msg.Transfer{
+				{key.GetAddr(), bnbTypes.Coins{bnbTypes.Coin{Denom: "BNB", Amount: 1}}},
+			},
+		),
+	}
+	account, err := getCosmosAccountInfo(key)
+	if err != nil {
+		return err
+	}
+	m := bnbTx.StdSignMsg{
+		Msgs:          mess,
+		Source:        0,
+		Sequence:      account.Sequence,
+		AccountNumber: account.Number,
+		ChainID:       "Binance-Chain-Nile",
+	}
+	signed, err := key.Sign(m)
+	*s.signedTransaction = hex.EncodeToString(signed)
+	*s.transactionHash = tendermintCrypto.Sha256(signed)
 	return err
 }
 
@@ -138,21 +185,17 @@ func (s *TestSuit) signEthereumRawTxn() error {
 	if err != nil {
 		return err
 	}
-
 	nonce, err := ethclient.PendingNonceAt(
 		context.Background(),
 		crypto.PubkeyToAddress(key.PublicKey),
 	)
-
 	if err != nil {
 		return err
 	}
-
 	gasPrice, err := ethclient.SuggestGasPrice(context.Background())
 	if err != nil {
 		return err
 	}
-
 	to := ethCommon.HexToAddress(crypto.PubkeyToAddress(key.PublicKey).Hex())
 	tx := ethTypes.NewTransaction(
 		nonce,
@@ -180,9 +223,10 @@ func (s *TestSuit) signEthereumRawTxn() error {
 }
 
 func (s *TestSuit) checkTransactionIsAccepted() error {
+	fmt.Println("Checking for transaction...")
 	switch *s.ticker {
 	case "tbnb":
-		return s.checkEthereumTransaction()
+		return s.checkCosmosTransaction()
 	case "gor":
 		return s.checkEthereumTransaction()
 
