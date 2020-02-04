@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/big"
+	"os"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -16,6 +19,7 @@ import (
 	"github.com/hashcloak/Meson-plugin/pkg/common"
 	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
+	"github.com/katzenpost/core/crypto/ecdh"
 )
 
 type TestSuit struct {
@@ -26,9 +30,28 @@ type TestSuit struct {
 	transactionHash   *[]byte
 }
 
+type MesonReply struct {
+	Message    string `json:"Message,omitempty"`
+	StatusCode uint   `json:"StatusCode"`
+	Version    uint   `json:"Version"`
+}
+
 func getRPCUrl(currencyTomlPath string) *string {
 	val := "https://goerli.hashcloak.com"
 	return &val
+}
+
+func setupMesonClient(cfg *config.Config) (*config.Config, *ecdh.PrivateKey) {
+	maxTries := 10
+	defer func() {
+		if r := recover(); r != nil {
+			if r == "pki: requested epoch will never get a document" {
+				maxTries++
+				fmt.Println("Recovered in f", r)
+			}
+		}
+	}()
+	return client.AutoRegisterRandomClient(cfg)
 }
 
 func main() {
@@ -56,20 +79,22 @@ func main() {
 		panic("Raw txn error: " + err.Error())
 	}
 
-	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
+	cfg, linkKey := setupMesonClient(cfg)
+	//cfg, linkKey := client.AutoRegisterRandomClient(cfg)
+
 	c, err := client.New(cfg)
 	if err != nil {
-		panic(err)
+		panic("New Client error: " + err.Error())
 	}
 	session, err := c.NewSession(linkKey)
 	if err != nil {
-		panic(err)
+		panic("Session error: " + err.Error())
 	}
 
 	// serialize our transaction inside a eth kaetzpost request message
 	mesonService, err := session.GetService(*service)
 	if err != nil {
-		panic("Client error" + err.Error())
+		panic("Client error: " + err.Error())
 	}
 
 	mesonRequest := common.NewRequest(*ticker, *testSuit.signedTransaction).ToJson()
@@ -77,7 +102,19 @@ func main() {
 	if err != nil {
 		panic("Meson Request Error" + err.Error())
 	}
+	reply = bytes.TrimRight(reply, "\x00")
 	fmt.Printf("reply: %s\n", reply)
+	var mesonReply MesonReply
+	err = json.Unmarshal(reply, &mesonReply)
+	if err != nil {
+		panic("Unmarshal error: " + err.Error())
+	}
+	testSuit.checkTransactionIsAccepted()
+	if mesonReply.Message == "success" {
+		fmt.Println("Messages are the same")
+	} else {
+		os.Exit(-1)
+	}
 	fmt.Println("Done. Shutting down.")
 	c.Shutdown()
 }
@@ -88,7 +125,6 @@ func (s *TestSuit) produceSignedRawTxn() error {
 	case "tbnb":
 		err = s.signEthereumRawTxn()
 	case "gor":
-		fmt.Println("HEYO")
 		err = s.signEthereumRawTxn()
 	}
 	return err
@@ -145,16 +181,17 @@ func (s *TestSuit) signEthereumRawTxn() error {
 func (s *TestSuit) checkTransactionIsAccepted() error {
 	switch *s.ticker {
 	case "tbnb":
-		return s.signEthereumRawTxn()
+		return s.checkEthereumTransaction()
 	case "gor":
-		return s.checkEthereumTransacton()
+		return s.checkEthereumTransaction()
 
 	default:
 		return fmt.Errorf("Wrong ticker")
 	}
 }
 
-func (s *TestSuit) checkEthereumTransacton() error {
+func (s *TestSuit) checkEthereumTransaction() error {
+	fmt.Println("Checking for transaction...")
 	ethclient, err := ethclient.Dial(*s.rpcURL)
 	if err != nil {
 		return err
