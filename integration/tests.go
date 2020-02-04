@@ -27,7 +27,7 @@ type TestSuit struct {
 	rpcURL            *string
 	ticker            *string
 	signedTransaction *string
-	transactionHash   *[]byte
+	transactionHash   *string
 }
 
 type MesonReply struct {
@@ -100,16 +100,17 @@ func main() {
 	mesonRequest := common.NewRequest(*ticker, *testSuit.signedTransaction).ToJson()
 	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
 	if err != nil {
-		panic("Meson Request Error" + err.Error())
+		panic("Meson Request Error " + err.Error())
 	}
 	reply = bytes.TrimRight(reply, "\x00")
-	fmt.Printf("reply: %s\n", reply)
 	var mesonReply MesonReply
 	err = json.Unmarshal(reply, &mesonReply)
 	if err != nil {
 		panic("Unmarshal error: " + err.Error())
 	}
-	testSuit.checkTransactionIsAccepted()
+	if err := testSuit.checkTransactionIsAccepted(); err != nil {
+		panic("No transaction: " + err.Error())
+	}
 	if mesonReply.Message == "success" {
 		fmt.Println("Messages are the same")
 	} else {
@@ -161,8 +162,6 @@ func (s *TestSuit) signEthereumRawTxn() error {
 		gasPrice,
 		[]byte(""),
 	)
-	tempValue := tx.Hash().Bytes()
-	s.transactionHash = &tempValue
 
 	id, err := ethclient.ChainID(context.Background())
 	if err != nil {
@@ -173,6 +172,8 @@ func (s *TestSuit) signEthereumRawTxn() error {
 		return err
 	}
 
+	tempValue := signedTx.Hash().Hex()
+	s.transactionHash = &tempValue
 	tempString := "0x" + hex.EncodeToString(types.Transactions{signedTx}.GetRlp(0))
 	s.signedTransaction = &tempString
 	return nil
@@ -196,13 +197,22 @@ func (s *TestSuit) checkEthereumTransaction() error {
 	if err != nil {
 		return err
 	}
-	hash := ethCommon.BytesToHash(*s.transactionHash)
-	receipt, err := ethclient.TransactionReceipt(context.Background(), hash)
+	hash := ethCommon.FromHex(*s.transactionHash)
+	txn, pending, err := ethclient.TransactionByHash(context.Background(), ethCommon.BytesToHash(hash))
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(receipt)
+	fmt.Printf("Pending: %v\nTXN:\n %+v\n", pending, txn)
 
+	if !pending {
+		receipt, err := ethclient.TransactionReceipt(context.Background(), ethCommon.BytesToHash(hash))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Receipt:\n%+v\n", receipt)
+	}
+
+	fmt.Println("Done..")
 	return nil
 }
