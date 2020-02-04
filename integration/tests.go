@@ -215,10 +215,8 @@ func (s *TestSuit) signEthereumRawTxn() error {
 		return err
 	}
 
-	tempValue := signedTx.Hash().Hex()
-	s.transactionHash = &tempValue
-	tempString := "0x" + hex.EncodeToString(types.Transactions{signedTx}.GetRlp(0))
-	s.signedTransaction = &tempString
+	*s.transactionHash = signedTx.Hash().Bytes()
+	*s.signedTransaction = "0x" + hex.EncodeToString(types.Transactions{signedTx}.GetRlp(0))
 	return nil
 }
 
@@ -235,28 +233,40 @@ func (s *TestSuit) checkTransactionIsAccepted() error {
 	}
 }
 
+func (s *TestSuit) checkCosmosTransaction() error {
+	key, err := keys.NewPrivateKeyManager(*s.pk)
+	clientSDK, err := sdk.NewDexClient("testnet-dex.binance.org", bnbTypes.TestNetwork, key)
+	if err != nil {
+		return err
+	}
+	result, err := clientSDK.GetTx(hex.EncodeToString(*s.transactionHash))
+	if err != nil {
+		return err
+	}
+	fmt.Println("RESULT: ", result)
+	return nil
+}
+
 func (s *TestSuit) checkEthereumTransaction() error {
-	fmt.Println("Checking for transaction...")
 	ethclient, err := ethclient.Dial(*s.rpcURL)
 	if err != nil {
 		return err
 	}
-	hash := ethCommon.FromHex(*s.transactionHash)
-	txn, pending, err := ethclient.TransactionByHash(context.Background(), ethCommon.BytesToHash(hash))
+
+	hash := ethCommon.BytesToHash(*s.transactionHash)
+	_, pending, err := ethclient.TransactionByHash(context.Background(), hash)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Pending: %v\nTXN:\n %+v\n", pending, txn)
-
 	if !pending {
-		receipt, err := ethclient.TransactionReceipt(context.Background(), ethCommon.BytesToHash(hash))
+		receipt, err := ethclient.TransactionReceipt(context.Background(), hash)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Receipt:\n%+v\n", receipt)
+		if receipt.BlockNumber == nil {
+			return fmt.Errorf("Transaction is not pending and has no blocknumber")
+		}
 	}
-
-	fmt.Println("Done..")
 	return nil
 }
