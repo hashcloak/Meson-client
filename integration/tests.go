@@ -7,8 +7,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"net/http"
 	"os"
+	"strings"
 
 	sdk "github.com/binance-chain/go-sdk/client"
 	bnbTypes "github.com/binance-chain/go-sdk/common/types"
@@ -23,6 +26,7 @@ import (
 	tendermintCrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/hashcloak/Meson-plugin/pkg/common"
+	mesonConfig "github.com/hashcloak/Meson-plugin/pkg/config"
 	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
 	"github.com/katzenpost/core/crypto/ecdh"
@@ -51,6 +55,7 @@ func getCosmosAccountInfo(key keys.KeyManager) (*bnbTypes.BalanceAccount, error)
 }
 
 func getRPCUrl(currencyTomlPath string) *string {
+	mesonConfig.Config{}
 	val := "https://goerli.hashcloak.com"
 	return &val
 }
@@ -77,7 +82,7 @@ func main() {
 
 	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
-		panic(err)
+		panic("Config file error: " + err.Error())
 	}
 	if *privKey == "" {
 		panic("must specify a transaction blob in hex or a private key to sign a txn")
@@ -96,8 +101,8 @@ func main() {
 	}
 
 	cfg, linkKey := setupMesonClient(cfg)
+	// Alternative method that doesn't catch errors
 	//cfg, linkKey := client.AutoRegisterRandomClient(cfg)
-
 	c, err := client.New(cfg)
 	if err != nil {
 		panic("New Client error: " + err.Error())
@@ -128,11 +133,12 @@ func main() {
 		fmt.Println("Message was not a success: ", mesonReply.Message)
 		os.Exit(-1)
 	}
+	fmt.Println("Transaction submitted. Shutting down meson client")
+	c.Shutdown()
+
 	if err := testSuite.checkTransactionIsAccepted(); err != nil {
 		panic("Transaction error: " + err.Error())
 	}
-	fmt.Println("Done. Shutting down.")
-	c.Shutdown()
 }
 
 func (s *TestSuite) produceSignedRawTxn() error {
@@ -234,16 +240,25 @@ func (s *TestSuite) checkTransactionIsAccepted() error {
 }
 
 func (s *TestSuite) checkCosmosTransaction() error {
-	key, err := keys.NewPrivateKeyManager(*s.pk)
-	clientSDK, err := sdk.NewDexClient("testnet-dex.binance.org", bnbTypes.TestNetwork, key)
+	txnUpperCase := strings.ToUpper(hex.EncodeToString(*s.transactionHash))
+	fmt.Printf("Checking for transaction: %v\n", txnUpperCase)
+
+	//https://tbinance.hashcloak.com/tx?hash=0x3A6D8270FC9C579282C07CAFD15E80086851B383208880EAAA09A6F6BB708E5D&prove=true
+	url := "https://tbinance.hashcloak.com/tx?hash=0x%s&prove=%s"
+	url = fmt.Sprintf(url, txnUpperCase, "false")
+	fmt.Println(url)
+
+	httpResponse, err := http.Post(url, "application/json", nil)
 	if err != nil {
-		return err
+		panic(err)
 	}
-	result, err := clientSDK.GetTx(hex.EncodeToString(*s.transactionHash))
+	defer httpResponse.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
-		return err
+		panic(err)
 	}
-	fmt.Println("RESULT: ", result)
+
+	fmt.Printf("Response: %+v\n", string(bodyBytes))
 	return nil
 }
 
@@ -268,5 +283,6 @@ func (s *TestSuite) checkEthereumTransaction() error {
 			return fmt.Errorf("Transaction is not pending and has no blocknumber")
 		}
 	}
+	fmt.Printf("Ethereum transaction found: %v\n", hash.String())
 	return nil
 }
