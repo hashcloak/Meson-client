@@ -73,74 +73,6 @@ func setupMesonClient(cfg *config.Config) (*config.Config, *ecdh.PrivateKey) {
 	return client.AutoRegisterRandomClient(cfg)
 }
 
-func main() {
-	cfgFile := flag.String("c", "client.toml", "Path to the server config file")
-	ticker := flag.String("t", "", "Ticker")
-	service := flag.String("s", "", "Service Name")
-	privKey := flag.String("pk", "", "Private key used to sign the txn")
-	flag.Parse()
-
-	cfg, err := config.LoadFile(*cfgFile)
-	if err != nil {
-		panic("Config file error: " + err.Error())
-	}
-	if *privKey == "" {
-		panic("must specify a transaction blob in hex or a private key to sign a txn")
-	}
-
-	testSuite := &TestSuite{
-		pk:                privKey,
-		ticker:            ticker,
-		rpcURL:            getRPCUrl(""),
-		signedTransaction: new(string),
-		transactionHash:   new([]byte),
-	}
-
-	if err := testSuite.produceSignedRawTxn(); err != nil {
-		panic("Raw txn error: " + err.Error())
-	}
-
-	cfg, linkKey := setupMesonClient(cfg)
-	// Alternative method that doesn't catch errors
-	//cfg, linkKey := client.AutoRegisterRandomClient(cfg)
-	c, err := client.New(cfg)
-	if err != nil {
-		panic("New Client error: " + err.Error())
-	}
-	session, err := c.NewSession(linkKey)
-	if err != nil {
-		panic("Session error: " + err.Error())
-	}
-
-	// serialize our transaction inside a eth kaetzpost request message
-	mesonService, err := session.GetService(*service)
-	if err != nil {
-		panic("Client error: " + err.Error())
-	}
-
-	mesonRequest := common.NewRequest(*ticker, *testSuite.signedTransaction).ToJson()
-	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
-	if err != nil {
-		panic("Meson Request Error " + err.Error())
-	}
-	reply = bytes.TrimRight(reply, "\x00")
-	var mesonReply MesonReply
-	err = json.Unmarshal(reply, &mesonReply)
-	if err != nil {
-		panic("Unmarshal error: " + err.Error())
-	}
-	if mesonReply.Message != "success" {
-		fmt.Println("Message was not a success: ", mesonReply.Message)
-		os.Exit(-1)
-	}
-	fmt.Println("Transaction submitted. Shutting down meson client")
-	c.Shutdown()
-
-	if err := testSuite.checkTransactionIsAccepted(); err != nil {
-		panic("Transaction error: " + err.Error())
-	}
-}
-
 func (s *TestSuite) produceSignedRawTxn() error {
 	var err error
 	switch *s.ticker {
@@ -285,4 +217,72 @@ func (s *TestSuite) checkEthereumTransaction() error {
 	}
 	fmt.Printf("Ethereum transaction found: %v\n", hash.String())
 	return nil
+}
+
+func main() {
+	cfgFile := flag.String("c", "client.toml", "Path to the server config file")
+	ticker := flag.String("t", "", "Ticker")
+	service := flag.String("s", "", "Service Name")
+	privKey := flag.String("pk", "", "Private key used to sign the txn")
+	flag.Parse()
+
+	cfg, err := config.LoadFile(*cfgFile)
+	if err != nil {
+		panic("Config file error: " + err.Error())
+	}
+	if *privKey == "" {
+		panic("must specify a transaction blob in hex or a private key to sign a txn")
+	}
+
+	testSuite := &TestSuite{
+		pk:                privKey,
+		ticker:            ticker,
+		rpcURL:            getRPCUrl(""),
+		signedTransaction: new(string),
+		transactionHash:   new([]byte),
+	}
+
+	if err := testSuite.produceSignedRawTxn(); err != nil {
+		panic("Raw txn error: " + err.Error())
+	}
+
+	cfg, linkKey := setupMesonClient(cfg)
+	// Alternative method that doesn't catch errors
+	//cfg, linkKey := client.AutoRegisterRandomClient(cfg)
+	c, err := client.New(cfg)
+	if err != nil {
+		panic("New Client error: " + err.Error())
+	}
+	session, err := c.NewSession(linkKey)
+	if err != nil {
+		panic("Session error: " + err.Error())
+	}
+
+	// serialize our transaction inside a eth kaetzpost request message
+	mesonService, err := session.GetService(*service)
+	if err != nil {
+		panic("Client error: " + err.Error())
+	}
+
+	mesonRequest := common.NewRequest(*ticker, *testSuite.signedTransaction).ToJson()
+	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
+	if err != nil {
+		panic("Meson Request Error " + err.Error())
+	}
+	reply = bytes.TrimRight(reply, "\x00")
+	var mesonReply MesonReply
+	err = json.Unmarshal(reply, &mesonReply)
+	if err != nil {
+		panic("Unmarshal error: " + err.Error())
+	}
+	if mesonReply.Message != "success" {
+		fmt.Println("Message was not a success: ", mesonReply.Message)
+		os.Exit(-1)
+	}
+	fmt.Println("Transaction submitted. Shutting down meson client")
+	c.Shutdown()
+
+	if err := testSuite.checkTransactionIsAccepted(); err != nil {
+		panic("Transaction error: " + err.Error())
+	}
 }
