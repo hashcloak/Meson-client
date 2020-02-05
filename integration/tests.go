@@ -28,7 +28,7 @@ import (
 	"github.com/katzenpost/core/crypto/ecdh"
 )
 
-type TestSuit struct {
+type TestSuite struct {
 	pk                *string
 	rpcURL            *string
 	ticker            *string
@@ -83,7 +83,7 @@ func main() {
 		panic("must specify a transaction blob in hex or a private key to sign a txn")
 	}
 
-	testSuit := &TestSuit{
+	testSuite := &TestSuite{
 		pk:                privKey,
 		ticker:            ticker,
 		rpcURL:            getRPCUrl(""),
@@ -91,7 +91,7 @@ func main() {
 		transactionHash:   new([]byte),
 	}
 
-	if err := testSuit.produceSignedRawTxn(); err != nil {
+	if err := testSuite.produceSignedRawTxn(); err != nil {
 		panic("Raw txn error: " + err.Error())
 	}
 
@@ -113,7 +113,7 @@ func main() {
 		panic("Client error: " + err.Error())
 	}
 
-	mesonRequest := common.NewRequest(*ticker, *testSuit.signedTransaction).ToJson()
+	mesonRequest := common.NewRequest(*ticker, *testSuite.signedTransaction).ToJson()
 	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
 	if err != nil {
 		panic("Meson Request Error " + err.Error())
@@ -128,14 +128,14 @@ func main() {
 		fmt.Println("Message was not a success: ", mesonReply.Message)
 		os.Exit(-1)
 	}
-	if err := testSuit.checkTransactionIsAccepted(); err != nil {
+	if err := testSuite.checkTransactionIsAccepted(); err != nil {
 		panic("Transaction error: " + err.Error())
 	}
 	fmt.Println("Done. Shutting down.")
 	c.Shutdown()
 }
 
-func (s *TestSuit) produceSignedRawTxn() error {
+func (s *TestSuite) produceSignedRawTxn() error {
 	var err error
 	switch *s.ticker {
 	case "tbnb":
@@ -145,7 +145,7 @@ func (s *TestSuit) produceSignedRawTxn() error {
 	}
 	return err
 }
-func (s *TestSuit) signCosmosRawTxn() error {
+func (s *TestSuite) signCosmosRawTxn() error {
 	key, err := keys.NewPrivateKeyManager(*s.pk)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func (s *TestSuit) signCosmosRawTxn() error {
 }
 
 // signRawRawTransaction just signs a txn with
-func (s *TestSuit) signEthereumRawTxn() error {
+func (s *TestSuite) signEthereumRawTxn() error {
 	ethclient, err := ethclient.Dial(*s.rpcURL)
 	key, err := crypto.HexToECDSA(*s.pk)
 	if err != nil {
@@ -220,7 +220,7 @@ func (s *TestSuit) signEthereumRawTxn() error {
 	return nil
 }
 
-func (s *TestSuit) checkTransactionIsAccepted() error {
+func (s *TestSuite) checkTransactionIsAccepted() error {
 	fmt.Println("Checking for transaction...")
 	switch *s.ticker {
 	case "tbnb":
@@ -233,7 +233,7 @@ func (s *TestSuit) checkTransactionIsAccepted() error {
 	}
 }
 
-func (s *TestSuit) checkCosmosTransaction() error {
+func (s *TestSuite) checkCosmosTransaction() error {
 	key, err := keys.NewPrivateKeyManager(*s.pk)
 	clientSDK, err := sdk.NewDexClient("testnet-dex.binance.org", bnbTypes.TestNetwork, key)
 	if err != nil {
@@ -247,7 +247,7 @@ func (s *TestSuit) checkCosmosTransaction() error {
 	return nil
 }
 
-func (s *TestSuit) checkEthereumTransaction() error {
+func (s *TestSuite) checkEthereumTransaction() error {
 	ethclient, err := ethclient.Dial(*s.rpcURL)
 	if err != nil {
 		return err
