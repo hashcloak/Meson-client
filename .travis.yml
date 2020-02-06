@@ -13,6 +13,7 @@ script:
   - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson && git checkout restructure-repo-for-integration-tests 
   - make containers
   - cd $TRAVIS_BUILD_DIR
+  - ls /tmp && ls /tmp/meson-current
   - go test
 
 cache:
