@@ -11,9 +11,7 @@ before_install:
 script:
   - if [ -n "$(gofmt -l .)" ]; then echo "Go code is not formatted:"; gofmt -d .; exit 1; fi
   - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson && git checkout restructure-repo-for-integration-tests 
-  - make containers
-  - cd $TRAVIS_BUILD_DIR
-  - go run ./integration/tests.go -c /tmp/meson-current/client.toml -t gor -s gor -k /tmp/meson-current/provider-0/currency.toml -pk $ETHEREUM_PK
+  - TEST_COMMIT=$TRAVIS_COMMIT make test
 cache:
   directories:
     - $GOPATH
