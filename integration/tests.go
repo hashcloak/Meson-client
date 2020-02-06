@@ -26,7 +26,7 @@ import (
 	tendermintCrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/hashcloak/Meson-plugin/pkg/common"
-	mesonConfig "github.com/hashcloak/Meson-plugin/pkg/config"
+	currencyConfig "github.com/hashcloak/Meson-plugin/pkg/config"
 	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
 	"github.com/katzenpost/core/crypto/ecdh"
@@ -54,10 +54,12 @@ func getCosmosAccountInfo(key keys.KeyManager) (*bnbTypes.BalanceAccount, error)
 	return clientSDK.GetAccount(key.GetAddr().String())
 }
 
-func getRPCUrl(currencyTomlPath string) *string {
-	mesonConfig.Config{}
-	val := "https://goerli.hashcloak.com"
-	return &val
+func getCurrencyRPCUrl(currencyTomlPath *string) (*string, error) {
+	cfg, err := currencyConfig.LoadFile(*currencyTomlPath)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg.RPCURL, nil
 }
 
 func setupMesonClient(cfg *config.Config) (*config.Config, *ecdh.PrivateKey) {
@@ -224,6 +226,7 @@ func main() {
 	ticker := flag.String("t", "", "Ticker")
 	service := flag.String("s", "", "Service Name")
 	privKey := flag.String("pk", "", "Private key used to sign the txn")
+	currencyConfigPath := flag.String("k", "", "The currency.toml path")
 	flag.Parse()
 
 	cfg, err := config.LoadFile(*cfgFile)
@@ -233,11 +236,18 @@ func main() {
 	if *privKey == "" {
 		panic("must specify a transaction blob in hex or a private key to sign a txn")
 	}
+	if *currencyConfigPath == "" {
+		panic("You need to specify the currency.toml file used by the Meson plugin")
+	}
+	rpcURL, err := getCurrencyRPCUrl(currencyConfigPath)
+	if err != nil {
+		panic("Currency config read error: " + err.Error())
+	}
 
 	testSuite := &TestSuite{
 		pk:                privKey,
 		ticker:            ticker,
-		rpcURL:            getRPCUrl(""),
+		rpcURL:            rpcURL,
 		signedTransaction: new(string),
 		transactionHash:   new([]byte),
 	}
