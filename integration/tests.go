@@ -14,10 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/hashcloak/Meson-plugin/pkg/common"
+	client "github.com/hashcloak/Meson-client"
 	currencyConfig "github.com/hashcloak/Meson-plugin/pkg/config"
-	"github.com/katzenpost/client"
-	"github.com/katzenpost/client/config"
 )
 
 type TestSuite struct {
@@ -136,52 +134,8 @@ func (s *TestSuite) checkEthereumTransaction() error {
 	return nil
 }
 
-func (s *TestSuite) mesonRequest(cfgFile *string) error {
-
-	cfg, err := config.LoadFile(*cfgFile)
-	if err != nil {
-		return fmt.Errorf("Config file error: %v", err)
-	}
-
-	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
-	c, err := client.New(cfg)
-	if err != nil {
-		return fmt.Errorf("New Client error: %v", err)
-	}
-
-	session, err := c.NewSession(linkKey)
-	if err != nil {
-		return fmt.Errorf("Session error: %v", err)
-	}
-
-	mesonService, err := session.GetService(*s.ticker)
-	if err != nil {
-		return fmt.Errorf("Client error: %v", err)
-	}
-
-	mesonRequest := common.NewRequest(*s.ticker, *s.signedTransaction).ToJson()
-	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
-	if err != nil {
-		return fmt.Errorf("Meson Request Error: %v", err)
-	}
-
-	reply = bytes.TrimRight(reply, "\x00")
-	var mesonReply MesonReply
-	if err := json.Unmarshal(reply, &mesonReply); err != nil {
-		return fmt.Errorf("Unmarshal error: %v", err)
-	}
-
-	if mesonReply.Message != "success" {
-		return fmt.Errorf("Message was not a success: %v", mesonReply.Message)
-	}
-
-	fmt.Println("Transaction submitted. Shutting down meson client")
-	c.Shutdown()
-	return nil
-}
-
 func main() {
-	cfgFile := flag.String("c", "client.toml", "Path to the server config file")
+	clientToml := flag.String("c", "client.toml", "Path to the server config file")
 	ticker := flag.String("t", "", "Ticker")
 	service := flag.String("s", "", "service")
 	privKey := flag.String("pk", "", "Private key used to sign the txn")
@@ -211,11 +165,27 @@ func main() {
 	}
 
 	if err := testSuite.produceSignedRawTxn(); err != nil {
-		panic("Raw txn error: " + err.Error())
+		panic("ERROR Signing raw transaction: " + err.Error())
 	}
 
-	if err := testSuite.mesonRequest(cfgFile); err != nil {
-		panic(err)
+	client, err := client.New(*clientToml, *testSuite.ticker)
+	if err != nil {
+		panic("ERROR In creating new client: " + err.Error())
+	}
+	client.Start()
+	reply, err := client.SendRawTransaction(testSuite.signedTransaction, testSuite.ticker)
+	if err != nil {
+		panic("ERROR Send raw transaction: " + err.Error())
+	}
+
+	reply = bytes.TrimRight(reply, "\x00")
+	var mesonReply MesonReply
+	if err := json.Unmarshal(reply, &mesonReply); err != nil {
+		panic("ERROR Unmarshal: " + err.Error())
+	}
+
+	if mesonReply.Message != "success" {
+		panic("ERROR Message was not successful, message: " + mesonReply.Message)
 	}
 
 	if err := testSuite.checkTransactionIsAccepted(); err != nil {

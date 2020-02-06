@@ -47,7 +47,7 @@ func (c *Client) Start() error {
 // It returns a reply and any error encountered.
 
 // Note: This is subject to change as we add more support for other blockchains
-func (c *Client) SendRawTransaction(rawTransactionBlob *string, chainID *int, ticker *string) ([]byte, error) {
+func (c *Client) SendRawTransaction(rawTransactionBlob *string, ticker *string) ([]byte, error) {
 	defer c.Shutdown()
 
 	req := common.NewRequest(*ticker, *rawTransactionBlob)
