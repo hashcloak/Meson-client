@@ -11,7 +11,7 @@ before_install:
 script:
   - if [ -n "$(gofmt -l .)" ]; then echo "Go code is not formatted:"; gofmt -d .; exit 1; fi
   - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson
-  - TEST_COMMIT=$TRAVIS_COMMIT make tests
+  - TEST_COMMIT=`git rev-parse --short HEAD` make tests
 cache:
   directories:
     - $GOPATH
