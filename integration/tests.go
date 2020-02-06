@@ -20,7 +20,6 @@ import (
 	currencyConfig "github.com/hashcloak/Meson-plugin/pkg/config"
 	"github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
-	"github.com/katzenpost/core/crypto/ecdh"
 )
 
 type TestSuite struct {
@@ -43,19 +42,6 @@ func getCurrencyRPCUrl(currencyTomlPath *string) (*string, error) {
 		return nil, err
 	}
 	return &cfg.RPCURL, nil
-}
-
-func setupMesonClient(cfg *config.Config) (*config.Config, *ecdh.PrivateKey) {
-	maxTries := 10
-	defer func() {
-		if r := recover(); r != nil {
-			if r == "pki: requested epoch will never get a document" {
-				maxTries++
-				fmt.Println("Recovered in f", r)
-			}
-		}
-	}()
-	return client.AutoRegisterRandomClient(cfg)
 }
 
 func (s *TestSuite) produceSignedRawTxn() error {
@@ -190,9 +176,7 @@ func main() {
 		panic("Raw txn error: " + err.Error())
 	}
 
-	cfg, linkKey := setupMesonClient(cfg)
-	// Alternative method that doesn't catch errors
-	//cfg, linkKey := client.AutoRegisterRandomClient(cfg)
+	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
 	c, err := client.New(cfg)
 	if err != nil {
 		panic("New Client error: " + err.Error())
