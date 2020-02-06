@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"math/big"
-	"os"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -141,20 +140,54 @@ func (s *TestSuite) checkEthereumTransaction() error {
 	return nil
 }
 
-func main() {
-	cfgFile := flag.String("c", "client.toml", "Path to the server config file")
-	ticker := flag.String("t", "", "Ticker")
-	service := flag.String("s", "", "Service Name")
-	privKey := flag.String("pk", "", "Private key used to sign the txn")
-	currencyConfigPath := flag.String("k", "", "The currency.toml path")
-	flag.Parse()
-
+func (s *TestSuite) mesonRequest(cfgFile *string) error {
 	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
 		panic("Config file error: " + err.Error())
 	}
+	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
+	c, err := client.New(cfg)
+	if err != nil {
+		panic("New Client error: " + err.Error())
+	}
+
+	session, err := c.NewSession(linkKey)
+	if err != nil {
+		panic("Session error: " + err.Error())
+	}
+
+	mesonService, err := session.GetService(*s.ticker)
+	if err != nil {
+		panic("Client error: " + err.Error())
+	}
+
+	mesonRequest := common.NewRequest(*s.ticker, *s.signedTransaction).ToJson()
+	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
+	if err != nil {
+		panic("Meson Request Error " + err.Error())
+	}
+	reply = bytes.TrimRight(reply, "\x00")
+	var mesonReply MesonReply
+	if err := json.Unmarshal(reply, &mesonReply); err != nil {
+		panic("Unmarshal error: " + err.Error())
+	}
+	if mesonReply.Message != "success" {
+		panic("Message was not a success: " + mesonReply.Message)
+	}
+	fmt.Println("Transaction submitted. Shutting down meson client")
+	c.Shutdown()
+	return nil
+}
+
+func main() {
+	cfgFile := flag.String("c", "client.toml", "Path to the server config file")
+	ticker := flag.String("t", "", "Ticker")
+	privKey := flag.String("pk", "", "Private key used to sign the txn")
+	currencyConfigPath := flag.String("k", "", "The currency.toml path")
+	flag.Parse()
+
 	if *privKey == "" {
-		panic("must specify a transaction blob in hex or a private key to sign a txn")
+		panic("Or a private key to sign a txn")
 	}
 	if *currencyConfigPath == "" {
 		panic("You need to specify the currency.toml file used by the Meson plugin")
@@ -176,39 +209,9 @@ func main() {
 		panic("Raw txn error: " + err.Error())
 	}
 
-	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
-	c, err := client.New(cfg)
-	if err != nil {
-		panic("New Client error: " + err.Error())
+	if err := testSuite.mesonRequest(cfgFile); err != nil {
+		panic(err)
 	}
-	session, err := c.NewSession(linkKey)
-	if err != nil {
-		panic("Session error: " + err.Error())
-	}
-
-	// serialize our transaction inside a eth kaetzpost request message
-	mesonService, err := session.GetService(*service)
-	if err != nil {
-		panic("Client error: " + err.Error())
-	}
-
-	mesonRequest := common.NewRequest(*ticker, *testSuite.signedTransaction).ToJson()
-	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
-	if err != nil {
-		panic("Meson Request Error " + err.Error())
-	}
-	reply = bytes.TrimRight(reply, "\x00")
-	var mesonReply MesonReply
-	err = json.Unmarshal(reply, &mesonReply)
-	if err != nil {
-		panic("Unmarshal error: " + err.Error())
-	}
-	if mesonReply.Message != "success" {
-		fmt.Println("Message was not a success: ", mesonReply.Message)
-		os.Exit(-1)
-	}
-	fmt.Println("Transaction submitted. Shutting down meson client")
-	c.Shutdown()
 
 	if err := testSuite.checkTransactionIsAccepted(); err != nil {
 		panic("Transaction error: " + err.Error())
