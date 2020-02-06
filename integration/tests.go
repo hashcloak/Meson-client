@@ -183,10 +183,11 @@ func main() {
 	if err := json.Unmarshal(reply, &mesonReply); err != nil {
 		panic("ERROR Unmarshal: " + err.Error())
 	}
-
 	if mesonReply.Message != "success" {
 		panic("ERROR Message was not successful, message: " + mesonReply.Message)
 	}
+	fmt.Println("Transaction submitted. Shutting down meson client")
+	client.Shutdown()
 
 	if err := testSuite.checkTransactionIsAccepted(); err != nil {
 		panic("Transaction error: " + err.Error())
