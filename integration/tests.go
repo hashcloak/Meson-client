@@ -63,10 +63,8 @@ func (s *TestSuite) signEthereumRawTxn() error {
 	if err != nil {
 		return err
 	}
-	nonce, err := ethclient.PendingNonceAt(
-		context.Background(),
-		crypto.PubkeyToAddress(key.PublicKey),
-	)
+	address := crypto.PubkeyToAddress(key.PublicKey)
+	nonce, err := ethclient.PendingNonceAt(context.Background(), address)
 	if err != nil {
 		return err
 	}
@@ -74,10 +72,9 @@ func (s *TestSuite) signEthereumRawTxn() error {
 	if err != nil {
 		return err
 	}
-	to := ethCommon.HexToAddress(crypto.PubkeyToAddress(key.PublicKey).Hex())
 	tx := ethTypes.NewTransaction(
 		nonce,
-		to,
+		address,
 		big.NewInt(123),
 		uint64(21000),
 		gasPrice,
