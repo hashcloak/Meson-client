@@ -143,36 +143,36 @@ func (s *TestSuite) checkEthereumTransaction() error {
 func (s *TestSuite) mesonRequest(cfgFile *string) error {
 	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
-		panic("Config file error: " + err.Error())
+		return fmt.Errorf("Config file error: %v", err)
 	}
 	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
 	c, err := client.New(cfg)
 	if err != nil {
-		panic("New Client error: " + err.Error())
+		return fmt.Errorf("New Client error: %v", err)
 	}
 
 	session, err := c.NewSession(linkKey)
 	if err != nil {
-		panic("Session error: " + err.Error())
+		return fmt.Errorf("Session error: %v", err)
 	}
 
 	mesonService, err := session.GetService(*s.ticker)
 	if err != nil {
-		panic("Client error: " + err.Error())
+		return fmt.Errorf("Client error: %v", err)
 	}
 
 	mesonRequest := common.NewRequest(*s.ticker, *s.signedTransaction).ToJson()
 	reply, err := session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
 	if err != nil {
-		panic("Meson Request Error " + err.Error())
+		return fmt.Errorf("Meson Request Error: %v", err)
 	}
 	reply = bytes.TrimRight(reply, "\x00")
 	var mesonReply MesonReply
 	if err := json.Unmarshal(reply, &mesonReply); err != nil {
-		panic("Unmarshal error: " + err.Error())
+		return fmt.Errorf("Unmarshal error: %v", err)
 	}
 	if mesonReply.Message != "success" {
-		panic("Message was not a success: " + mesonReply.Message)
+		return fmt.Errorf("Message was not a success: %v", mesonReply.Message)
 	}
 	fmt.Println("Transaction submitted. Shutting down meson client")
 	c.Shutdown()
