@@ -141,10 +141,12 @@ func (s *TestSuite) checkEthereumTransaction() error {
 }
 
 func (s *TestSuite) mesonRequest(cfgFile *string) error {
+
 	cfg, err := config.LoadFile(*cfgFile)
 	if err != nil {
 		return fmt.Errorf("Config file error: %v", err)
 	}
+
 	cfg, linkKey := client.AutoRegisterRandomClient(cfg)
 	c, err := client.New(cfg)
 	if err != nil {
@@ -166,14 +168,17 @@ func (s *TestSuite) mesonRequest(cfgFile *string) error {
 	if err != nil {
 		return fmt.Errorf("Meson Request Error: %v", err)
 	}
+
 	reply = bytes.TrimRight(reply, "\x00")
 	var mesonReply MesonReply
 	if err := json.Unmarshal(reply, &mesonReply); err != nil {
 		return fmt.Errorf("Unmarshal error: %v", err)
 	}
+
 	if mesonReply.Message != "success" {
 		return fmt.Errorf("Message was not a success: %v", mesonReply.Message)
 	}
+
 	fmt.Println("Transaction submitted. Shutting down meson client")
 	c.Shutdown()
 	return nil
@@ -182,10 +187,14 @@ func (s *TestSuite) mesonRequest(cfgFile *string) error {
 func main() {
 	cfgFile := flag.String("c", "client.toml", "Path to the server config file")
 	ticker := flag.String("t", "", "Ticker")
+	service := flag.String("s", "", "service")
 	privKey := flag.String("pk", "", "Private key used to sign the txn")
 	currencyConfigPath := flag.String("k", "", "The currency.toml path")
 	flag.Parse()
 
+	if *service != *ticker {
+		panic("-s service and -t ticker are not the same")
+	}
 	if *privKey == "" {
 		panic("Or a private key to sign a txn")
 	}
