@@ -1,8 +1,9 @@
 package client
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestClientConnectShutdown(t *testing.T) {
@@ -24,7 +25,7 @@ func TestClientConnectShutdown(t *testing.T) {
 func TestClientSendTransaction(t *testing.T) {
 	require := require.New(t)
 
-	client, err := New("testdata/client.toml", "gor")
+	client, err := New("/tmp/meson-current/client.toml", "gor")
 	require.NoError(err)
 	require.NoError(client.Start())
 

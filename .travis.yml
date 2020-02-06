@@ -7,16 +7,11 @@ go:
 
 script:
   - if [ -n "$(gofmt -l .)" ]; then echo "Go code is not formatted:"; gofmt -d .; exit 1; fi
-  - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson && make up
-  - docker run --rm
-    -v $TRAVIS_BUILD_DIR:/client
-    --network nonvoting_testnet_nonvoting_test_net
-    -v /tmp/gopath-pkg:/go/pkg
-    -w /client
-    golang:buster
-    /bin/bash -c "GORACE=history_size=7 go test -race"
+  - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson && git checkout restructure-repo-for-integration-tests 
+  - make containers
+  - cd $TRAVIS_BUILD_DIR
+  - go test
 
 cache:
   directories:
-    - $GOPATH/pkg/mod
-    - /tmp/gopath-pkg
+    - $GOPATH
