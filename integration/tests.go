@@ -10,7 +10,6 @@ import (
 	"math/big"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -89,13 +88,13 @@ func (s *TestSuite) signEthereumRawTxn() error {
 	if err != nil {
 		return err
 	}
-	signedTx, err := ethTypes.SignTx(tx, types.NewEIP155Signer(id), key)
+	signedTx, err := ethTypes.SignTx(tx, ethTypes.NewEIP155Signer(id), key)
 	if err != nil {
 		return err
 	}
 
 	*s.transactionHash = signedTx.Hash().Bytes()
-	*s.signedTransaction = "0x" + hex.EncodeToString(types.Transactions{signedTx}.GetRlp(0))
+	*s.signedTransaction = "0x" + hex.EncodeToString(ethTypes.Transactions{signedTx}.GetRlp(0))
 	return nil
 }
 
