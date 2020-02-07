@@ -7,7 +7,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"net/http"
+	"strings"
+
+	sdk "github.com/binance-chain/go-sdk/client"
+	bnbTypes "github.com/binance-chain/go-sdk/common/types"
+	"github.com/binance-chain/go-sdk/keys"
+	"github.com/binance-chain/go-sdk/types/msg"
+	bnbTx "github.com/binance-chain/go-sdk/types/tx"
+	tendermintCrypto "github.com/tendermint/tendermint/crypto"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -32,6 +42,14 @@ type MesonReply struct {
 	Version    uint   `json:"Version"`
 }
 
+func getCosmosAccountInfo(key keys.KeyManager) (*bnbTypes.BalanceAccount, error) {
+	clientSDK, err := sdk.NewDexClient("testnet-dex.binance.org", bnbTypes.TestNetwork, key)
+	if err != nil {
+		return nil, err
+	}
+	return clientSDK.GetAccount(key.GetAddr().String())
+}
+
 func getCurrencyRPCUrl(currencyTomlPath *string) (*string, error) {
 	cfg, err := currencyConfig.LoadFile(*currencyTomlPath)
 	if err != nil {
@@ -51,7 +69,36 @@ func (s *TestSuite) produceSignedRawTxn() error {
 	return err
 }
 func (s *TestSuite) signCosmosRawTxn() error {
-	return nil
+	key, err := keys.NewPrivateKeyManager(*s.pk)
+	if err != nil {
+		return err
+	}
+	mess := []msg.Msg{
+		msg.CreateSendMsg(
+			key.GetAddr(),
+			bnbTypes.Coins{
+				bnbTypes.Coin{Denom: "BNB", Amount: 1},
+			},
+			[]msg.Transfer{
+				{key.GetAddr(), bnbTypes.Coins{bnbTypes.Coin{Denom: "BNB", Amount: 1}}},
+			},
+		),
+	}
+	account, err := getCosmosAccountInfo(key)
+	if err != nil {
+		return err
+	}
+	m := bnbTx.StdSignMsg{
+		Msgs:          mess,
+		Source:        0,
+		Sequence:      account.Sequence,
+		AccountNumber: account.Number,
+		ChainID:       "Binance-Chain-Nile",
+	}
+	signed, err := key.Sign(m)
+	*s.signedTransaction = hex.EncodeToString(signed)
+	*s.transactionHash = tendermintCrypto.Sha256(signed)
+	return err
 }
 
 // signRawRawTransaction just signs a txn with
@@ -106,7 +153,27 @@ func (s *TestSuite) checkTransactionIsAccepted() error {
 }
 
 func (s *TestSuite) checkCosmosTransaction() error {
+	txnUpperCase := strings.ToUpper(hex.EncodeToString(*s.transactionHash))
+	fmt.Printf("Checking for transaction: %v\n", txnUpperCase)
+
+	//https://tbinance.hashcloak.com/tx?hash=0x3A6D8270FC9C579282C07CAFD15E80086851B383208880EAAA09A6F6BB708E5D&prove=true
+	url := "https://tbinance.hashcloak.com/tx?hash=0x%s&prove=%s"
+	url = fmt.Sprintf(url, txnUpperCase, "false")
+	fmt.Println(url)
+
+	httpResponse, err := http.Post(url, "application/json", nil)
+	if err != nil {
+		panic(err)
+	}
+	defer httpResponse.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(httpResponse.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Response: %+v\n", string(bodyBytes))
 	return nil
+
 }
 
 func (s *TestSuite) checkEthereumTransaction() error {
