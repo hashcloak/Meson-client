@@ -1,22 +1,21 @@
 language: go
 
-sudo: false
-
 go:
   - "1.13"
 
+before_install:
+  - docker swarm init
+
 script:
   - if [ -n "$(gofmt -l .)" ]; then echo "Go code is not formatted:"; gofmt -d .; exit 1; fi
-  - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson && make up
-  - docker run --rm
-    -v $TRAVIS_BUILD_DIR:/client
-    --network nonvoting_testnet_nonvoting_test_net
-    -v /tmp/gopath-pkg:/go/pkg
-    -w /client
-    golang:buster
-    /bin/bash -c "GORACE=history_size=7 go test -race"
+  - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson
+  - |
+    if [[ $TRAVIS_EVENT_TYPE == "pull_request" ]]; then
+      TEST_COMMIT=$TRAVIS_PULL_REQUEST_SHA make tests
+    else
+      TEST_COMMIT=$TRAVIS_COMMIT make tests
+    fi
 
 cache:
   directories:
-    - $GOPATH/pkg/mod
-    - /tmp/gopath-pkg
+    - $GOPATH

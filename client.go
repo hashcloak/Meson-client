@@ -4,14 +4,15 @@ package client
 
 import (
 	"errors"
+	"path/filepath"
+	"sync"
+
 	"github.com/hashcloak/Meson-plugin/pkg/common"
 	katzenClient "github.com/katzenpost/client"
 	"github.com/katzenpost/client/config"
 	"github.com/katzenpost/core/crypto/ecdh"
 	"github.com/katzenpost/core/log"
 	"gopkg.in/op/go-logging.v1"
-	"path/filepath"
-	"sync"
 )
 
 type Client struct {
@@ -46,10 +47,10 @@ func (c *Client) Start() error {
 // It returns a reply and any error encountered.
 
 // Note: This is subject to change as we add more support for other blockchains
-func (c *Client) SendRawTransaction(rawTransactionBlob *string, chainID *int, ticker *string) ([]byte, error) {
+func (c *Client) SendRawTransaction(rawTransactionBlob *string, ticker *string) ([]byte, error) {
 	defer c.Shutdown()
 
-	req := common.NewRequest(*ticker, *rawTransactionBlob, *chainID)
+	req := common.NewRequest(*ticker, *rawTransactionBlob)
 	mesonRequest := req.ToJson()
 
 	mesonService, err := c.session.GetService(c.service)
