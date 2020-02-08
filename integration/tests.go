@@ -42,6 +42,13 @@ type MesonReply struct {
 	Version    uint   `json:"Version"`
 }
 
+type result struct {
+	Hash string `json:"hash"`
+}
+type cosmosReply struct {
+	Result result `json:"result"`
+}
+
 func getCosmosAccountInfo(key keys.KeyManager) (*bnbTypes.BalanceAccount, error) {
 	clientSDK, err := sdk.NewDexClient("testnet-dex.binance.org", bnbTypes.TestNetwork, key)
 	if err != nil {
@@ -154,8 +161,7 @@ func (s *TestSuite) checkTransactionIsAccepted() error {
 
 func (s *TestSuite) checkCosmosTransaction() error {
 	txnUpperCase := strings.ToUpper(hex.EncodeToString(*s.transactionHash))
-	url := "https://tbinance.hashcloak.com/tx?hash=0x%s&prove=%s"
-	url = fmt.Sprintf(url, txnUpperCase, "false")
+	url := fmt.Sprintf("%s/tx?hash=0x%s&prove=%s", *s.rpcURL, txnUpperCase, "false")
 	httpResponse, err := http.Post(url, "application/json", nil)
 	if err != nil {
 		return err
@@ -164,12 +170,6 @@ func (s *TestSuite) checkCosmosTransaction() error {
 	bodyBytes, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
 		return err
-	}
-	type result struct {
-		Hash string `json:"hash"`
-	}
-	type cosmosReply struct {
-		Result result `json:"result"`
 	}
 	var reply cosmosReply
 	if err := json.Unmarshal(bodyBytes, &reply); err != nil {
