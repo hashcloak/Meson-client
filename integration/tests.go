@@ -156,22 +156,30 @@ func (s *TestSuite) checkCosmosTransaction() error {
 	txnUpperCase := strings.ToUpper(hex.EncodeToString(*s.transactionHash))
 	fmt.Printf("Checking for transaction: %v\n", txnUpperCase)
 
-	//https://tbinance.hashcloak.com/tx?hash=0x3A6D8270FC9C579282C07CAFD15E80086851B383208880EAAA09A6F6BB708E5D&prove=true
 	url := "https://tbinance.hashcloak.com/tx?hash=0x%s&prove=%s"
 	url = fmt.Sprintf(url, txnUpperCase, "false")
 	fmt.Println(url)
 
 	httpResponse, err := http.Post(url, "application/json", nil)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer httpResponse.Body.Close()
 	bodyBytes, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
-		panic(err)
+		return err
 	}
-
 	fmt.Printf("Response: %+v\n", string(bodyBytes))
+
+	type cosmosReply struct {
+		Result string `json:"result"`
+		ID     uint   `json:"id"`
+	}
+	var reply cosmosReply
+	if err := json.Unmarshal(bodyBytes, &reply); err != nil {
+		panic("ERROR Unmarshal: " + err.Error())
+	}
+	fmt.Println(reply.Result)
 	return nil
 
 }
