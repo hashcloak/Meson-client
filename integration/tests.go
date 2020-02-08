@@ -154,12 +154,8 @@ func (s *TestSuite) checkTransactionIsAccepted() error {
 
 func (s *TestSuite) checkCosmosTransaction() error {
 	txnUpperCase := strings.ToUpper(hex.EncodeToString(*s.transactionHash))
-	fmt.Printf("Checking for transaction: %v\n", txnUpperCase)
-
 	url := "https://tbinance.hashcloak.com/tx?hash=0x%s&prove=%s"
 	url = fmt.Sprintf(url, txnUpperCase, "false")
-	fmt.Println(url)
-
 	httpResponse, err := http.Post(url, "application/json", nil)
 	if err != nil {
 		return err
@@ -169,17 +165,20 @@ func (s *TestSuite) checkCosmosTransaction() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Response: %+v\n", string(bodyBytes))
-
+	type result struct {
+		Hash string `json:"hash"`
+	}
 	type cosmosReply struct {
-		Result string `json:"result"`
-		ID     uint   `json:"id"`
+		Result result `json:"result"`
 	}
 	var reply cosmosReply
 	if err := json.Unmarshal(bodyBytes, &reply); err != nil {
-		panic("ERROR Unmarshal: " + err.Error())
+		return err
 	}
-	fmt.Println(reply.Result)
+	if txnUpperCase != reply.Result.Hash {
+		return fmt.Errorf("Error. Got: %v, wanted: %v", txnUpperCase, reply.Result.Hash)
+	}
+	fmt.Println("Found cosmos txn: ", reply.Result.Hash)
 	return nil
 
 }
