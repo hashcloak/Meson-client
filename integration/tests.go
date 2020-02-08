@@ -180,7 +180,6 @@ func (s *TestSuite) checkCosmosTransaction() error {
 	}
 	fmt.Println("Found cosmos txn: ", reply.Result.Hash)
 	return nil
-
 }
 
 func (s *TestSuite) checkEthereumTransaction() error {
