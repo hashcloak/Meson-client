@@ -12,15 +12,20 @@ script:
     make testnet
     cd -
   - |
-    while [ 1 ]; do
+    attempts=$((1)) 
+    while [ true ]; do
       go run  -ldflags "-X github.com/katzenpost/core/epochtime.WarpedEpoch=true -X github.com/katzenpost/server/internal/pki.WarpedEpoch=true" \
       ./integration/tests.go \
       -c /tmp/meson-testnet/client.toml \
       -k /tmp/meson-testnet/provider-0/currency.toml \
       -pk $TEST_PKS_ETHEREUM
       if [ $? -eq 0 ]; then
-        exit(0)
+        exit 0
       fi
+      if [[ $attempts == 3 ]]; then
+        exit 1
+      fi
+      attempts=$(($attempts+1))
     done
 
 cache:
