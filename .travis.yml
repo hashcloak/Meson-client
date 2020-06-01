@@ -12,8 +12,8 @@ script:
     make testnet
     cd -
   - |
-    go run ./integration/tests.go \
-    -ldflags "-X github.com/katzenpost/core/epochtime.WarpedEpoch=true -X github.com/katzenpost/server/internal/pki.WarpedEpoch=true" \
+    go run  -ldflags "-X github.com/katzenpost/core/epochtime.WarpedEpoch=true -X github.com/katzenpost/server/internal/pki.WarpedEpoch=true" \
+    ./integration/tests.go \
     -c /tmp/meson-testnet/client.toml \
     -k /tmp/meson-testnet/provider-0 \
     -pk $TEST_PKS_ETHEREUM
