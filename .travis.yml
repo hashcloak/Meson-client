@@ -12,11 +12,16 @@ script:
     make testnet
     cd -
   - |
-    go run  -ldflags "-X github.com/katzenpost/core/epochtime.WarpedEpoch=true -X github.com/katzenpost/server/internal/pki.WarpedEpoch=true" \
-    ./integration/tests.go \
-    -c /tmp/meson-testnet/client.toml \
-    -k /tmp/meson-testnet/provider-0/currency.toml \
-    -pk $TEST_PKS_ETHEREUM
+    while [ 1 ]; do
+      go run  -ldflags "-X github.com/katzenpost/core/epochtime.WarpedEpoch=true -X github.com/katzenpost/server/internal/pki.WarpedEpoch=true" \
+      ./integration/tests.go \
+      -c /tmp/meson-testnet/client.toml \
+      -k /tmp/meson-testnet/provider-0/currency.toml \
+      -pk $TEST_PKS_ETHEREUM
+      if [ $? -eq 0 ]; then
+        exit(0)
+      fi
+    done
 
 cache:
   directories:
