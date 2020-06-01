@@ -8,7 +8,7 @@ script:
   - |
     git clone https://github.com/hashcloak/Meson-plugin /tmp/meson-plugin
     cd /tmp/meson-plugin
-    git checkout $TESTNET_COMMIT
+    git checkout ${TESTNET_COMMIT:-master}
     make testnet
     cd -
   - |
