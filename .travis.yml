@@ -3,18 +3,30 @@ language: go
 go:
   - "1.13"
 
-before_install:
-  - docker swarm init
-
 script:
   - if [ -n "$(gofmt -l .)" ]; then echo "Go code is not formatted:"; gofmt -d .; exit 1; fi
-  - git clone https://github.com/hashcloak/Meson /tmp/Meson && cd /tmp/Meson
   - |
-    if [[ $TRAVIS_EVENT_TYPE == "pull_request" ]]; then
-      TEST_COMMIT=$TRAVIS_PULL_REQUEST_SHA make tests
-    else
-      TEST_COMMIT=$TRAVIS_COMMIT make tests
-    fi
+    git clone https://github.com/hashcloak/Meson-plugin /tmp/meson-plugin
+    cd /tmp/meson-plugin
+    git checkout ${TESTNET_COMMIT:-master}
+    make testnet
+    cd -
+  - |
+    attempts=$((1)) 
+    while [ true ]; do
+      go run  -ldflags "-X github.com/katzenpost/core/epochtime.WarpedEpoch=true -X github.com/katzenpost/server/internal/pki.WarpedEpoch=true" \
+      ./integration/tests.go \
+      -c /tmp/meson-testnet/client.toml \
+      -k /tmp/meson-testnet/provider-0/currency.toml \
+      -pk $TEST_PKS_ETHEREUM
+      if [ $? -eq 0 ]; then
+        exit 0
+      fi
+      if [[ $attempts == 3 ]]; then
+        exit 1
+      fi
+      attempts=$(($attempts+1))
+    done
 
 cache:
   directories:

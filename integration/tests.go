@@ -32,14 +32,6 @@ type MesonReply struct {
 	Version    uint   `json:"Version"`
 }
 
-func getCurrencyRPCUrl(currencyTomlPath *string) (*string, error) {
-	cfg, err := currencyConfig.LoadFile(*currencyTomlPath)
-	if err != nil {
-		return nil, err
-	}
-	return &cfg.RPCURL, nil
-}
-
 func (s *TestSuite) produceSignedRawTxn() error {
 	var err error
 	switch *s.ticker {
@@ -136,30 +128,25 @@ func (s *TestSuite) checkEthereumTransaction() error {
 
 func main() {
 	clientToml := flag.String("c", "client.toml", "Path to the server config file")
-	ticker := flag.String("t", "", "Ticker")
-	service := flag.String("s", "", "service")
 	privKey := flag.String("pk", "", "Private key used to sign the txn")
 	currencyConfigPath := flag.String("k", "", "The currency.toml path")
 	flag.Parse()
 
-	if *service != *ticker {
-		panic("-s service and -t ticker are not the same")
-	}
 	if *privKey == "" {
-		panic("Or a private key to sign a txn")
+		panic("Private key not provided")
 	}
 	if *currencyConfigPath == "" {
 		panic("You need to specify the currency.toml file used by the Meson plugin")
 	}
-	rpcURL, err := getCurrencyRPCUrl(currencyConfigPath)
+	cfg, err := currencyConfig.LoadFile(*currencyConfigPath)
 	if err != nil {
 		panic("Currency config read error: " + err.Error())
 	}
 
 	testSuite := &TestSuite{
 		pk:                privKey,
-		ticker:            ticker,
-		rpcURL:            rpcURL,
+		ticker:            &cfg.Ticker,
+		rpcURL:            &cfg.RPCURL,
 		signedTransaction: new(string),
 		transactionHash:   new([]byte),
 	}
