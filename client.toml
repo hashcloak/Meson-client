@@ -1,0 +1,17 @@
+
+[Logging]
+  Disable = false
+  Level = "DEBUG"
+  File = ""
+
+[UpstreamProxy]
+  Type = "none"
+
+[Debug]
+  DisableDecoyTraffic = true
+  CaseSensitiveUserIdentifiers = false
+  PollingInterval = 1
+
+[NonvotingAuthority]
+    Address = "157.245.41.154:30000"
+    PublicKey = "qVhmF/rOHVbHwhHBP6oOOP7fE9oPg4IuEoxac+RaCHk="
