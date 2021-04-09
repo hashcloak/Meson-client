@@ -32,8 +32,6 @@ import (
 	"github.com/katzenpost/core/pki"
 	registration "github.com/katzenpost/registration_client"
 	"github.com/tendermint/tendermint/light"
-	"github.com/tendermint/tendermint/light/provider"
-	"github.com/tendermint/tendermint/light/store"
 	"golang.org/x/net/idna"
 	"golang.org/x/text/secure/precis"
 )
@@ -118,11 +116,12 @@ func (d *Debug) fixup() {
 
 // TendermintClient is a tendermint client configuration.
 type TendermintClient struct {
-	TrustOptions light.TrustOptions
-	Primary      provider.Provider
-	Witnesses    []provider.Provider
-	TrustedStore store.Store
-	Rpcaddress   string
+	TrustOptions       light.TrustOptions
+	PrimaryAddress     string
+	WitnessesAddresses []string
+	DatabaseName       string
+	DatabaseDir        string
+	Rpcaddress         string
 }
 
 func (tcCfg *TendermintClient) validate() error {
@@ -137,12 +136,13 @@ func (tcCfg *TendermintClient) validate() error {
 func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (pki.Client, error) {
 	//! Proxy unused, should we add it somewhere?
 	cfg := &minclient.PKIClientConfig{
-		LogBackend:   l,
-		TrustOptions: c.TendermintClient.TrustOptions,
-		Primary:      c.TendermintClient.Primary,
-		Witnesses:    c.TendermintClient.Witnesses,
-		TrustedStore: c.TendermintClient.TrustedStore,
-		Rpcaddress:   c.TendermintClient.Rpcaddress,
+		LogBackend:         l,
+		TrustOptions:       c.TendermintClient.TrustOptions,
+		PrimaryAddress:     c.TendermintClient.PrimaryAddress,
+		WitnessesAddresses: c.TendermintClient.WitnessesAddresses,
+		DatabaseName:       c.TendermintClient.DatabaseName,
+		DatabaseDir:        c.TendermintClient.DatabaseDir,
+		Rpcaddress:         c.TendermintClient.Rpcaddress,
 	}
 	return minclient.NewPKIClient(cfg)
 }

@@ -14,22 +14,23 @@ import (
 	"github.com/katzenpost/core/log"
 	cpki "github.com/katzenpost/core/pki"
 	"github.com/tendermint/tendermint/light"
-	"github.com/tendermint/tendermint/light/provider"
 	lightrpc "github.com/tendermint/tendermint/light/rpc"
-	"github.com/tendermint/tendermint/light/store"
+	dbs "github.com/tendermint/tendermint/light/store/db"
 	"github.com/tendermint/tendermint/rpc/client/http"
+	"github.com/tendermint/tm-db/badgerdb"
 	"gopkg.in/op/go-logging.v1"
 )
 
 var _ cpki.Client = (*PKIClient)(nil)
 
 type PKIClientConfig struct {
-	LogBackend   *log.Backend
-	TrustOptions light.TrustOptions
-	Primary      provider.Provider
-	Witnesses    []provider.Provider
-	TrustedStore store.Store
-	Rpcaddress   string
+	LogBackend         *log.Backend
+	TrustOptions       light.TrustOptions
+	PrimaryAddress     string
+	WitnessesAddresses []string
+	DatabaseName       string
+	DatabaseDir        string
+	Rpcaddress         string
 }
 
 type PKIClient struct {
@@ -143,23 +144,28 @@ func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
 	p := new(PKIClient)
 	p.log = cfg.LogBackend.GetLogger("pki/client")
 
-	provider, err := http.New(cfg.Rpcaddress, "/websocket")
+	db, err := badgerdb.NewDB(cfg.DatabaseName, cfg.DatabaseDir)
 	if err != nil {
-		p.log.Errorf("Error connection to katzenmint-pki full node.")
-		return nil, err
+		p.log.Errorf("Error opening katzenmint-pki database.")
 	}
-	lightclient, err := light.NewClient(
-		context.TODO(),
+	lightclient, err := light.NewHTTPClient(
+		context.Background(),
 		"TODO: chainID_of_katzenmint_pki",
 		cfg.TrustOptions,
-		cfg.Primary,
-		cfg.Witnesses,
-		cfg.TrustedStore,
+		cfg.PrimaryAddress,
+		cfg.WitnessesAddresses,
+		dbs.New(db, "katzenmint"),
 	)
 	if err != nil {
 		p.log.Errorf("Error initialization of katzenmint-pki light client.")
 		return nil, err
 	}
+	provider, err := http.New(cfg.Rpcaddress, "/websocket")
+	if err != nil {
+		p.log.Errorf("Error connection to katzenmint-pki full node.")
+		return nil, err
+	}
+
 	p.light = lightrpc.NewClient(provider, lightclient)
 	return p, nil
 }

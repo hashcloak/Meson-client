@@ -13,6 +13,7 @@ require (
 	github.com/katzenpost/registration_client v0.0.1
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.6
+	github.com/tendermint/tm-db v0.6.5-0.20210215110957-53ed3dbaa3eb
 	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
 	golang.org/x/text v0.3.4
 	gopkg.in/eapache/channels.v1 v1.1.0
