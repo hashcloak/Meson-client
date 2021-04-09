@@ -79,7 +79,7 @@ func (c *Client) InitLogging() error {
 	var err error
 	c.logBackend, err = log.New(f, c.cfg.Logging.Level, c.cfg.Logging.Disable)
 	if err == nil {
-		c.log = c.logBackend.GetLogger("katzenpost/client")
+		c.log = c.logBackend.GetLogger("hashcloak/Meson-client")
 	}
 	return err
 }
