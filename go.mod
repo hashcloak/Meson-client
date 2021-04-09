@@ -7,7 +7,6 @@ require (
 	github.com/ethereum/go-ethereum v1.9.10
 	github.com/hashcloak/Meson-plugin v0.0.0-20200208012317-7f72000d5e7b
 	github.com/hashcloak/katzenmint-pki v0.0.0-20210409083424-225d4838706c
-	github.com/katzenpost/authority v0.0.9
 	github.com/katzenpost/client v0.0.3
 	github.com/katzenpost/core v0.0.11
 	github.com/katzenpost/minclient v0.0.6

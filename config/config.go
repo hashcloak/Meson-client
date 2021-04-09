@@ -26,13 +26,14 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/hashcloak/Meson-client/internal/proxy"
-	nvClient "github.com/katzenpost/authority/nonvoting/client"
-	vClient "github.com/katzenpost/authority/voting/client"
-	vServerConfig "github.com/katzenpost/authority/voting/server/config"
+	"github.com/hashcloak/Meson-client/minclient"
 	"github.com/katzenpost/core/crypto/eddsa"
 	"github.com/katzenpost/core/log"
 	"github.com/katzenpost/core/pki"
 	registration "github.com/katzenpost/registration_client"
+	"github.com/tendermint/tendermint/light"
+	"github.com/tendermint/tendermint/light/provider"
+	"github.com/tendermint/tendermint/light/store"
 	"golang.org/x/net/idna"
 	"golang.org/x/text/secure/precis"
 )
@@ -115,69 +116,35 @@ func (d *Debug) fixup() {
 	}
 }
 
-// NonvotingAuthority is a non-voting authority configuration.
-type NonvotingAuthority struct {
-	// Address is the IP address/port combination of the authority.
-	Address string
-
-	// PublicKey is the authority's public key.
-	PublicKey *eddsa.PublicKey
+// TendermintClient is a tendermint client configuration.
+type TendermintClient struct {
+	TrustOptions light.TrustOptions
+	Primary      provider.Provider
+	Witnesses    []provider.Provider
+	TrustedStore store.Store
+	Rpcaddress   string
 }
 
-// New constructs a pki.Client with the specified non-voting authority config.
-func (nvACfg *NonvotingAuthority) New(l *log.Backend, pCfg *proxy.Config) (pki.Client, error) {
-	cfg := &nvClient.Config{
-		LogBackend:    l,
-		Address:       nvACfg.Address,
-		PublicKey:     nvACfg.PublicKey,
-		DialContextFn: pCfg.ToDialContext("nonvoting:" + nvACfg.PublicKey.String()),
-	}
-	return nvClient.New(cfg)
-}
-
-func (nvACfg *NonvotingAuthority) validate() error {
-	if nvACfg.PublicKey == nil {
-		return errors.New("error PublicKey is missing")
+func (tcCfg *TendermintClient) validate() error {
+	//TODO: more checks
+	if tcCfg.Rpcaddress == "" {
+		return errors.New("RPC address is missing")
 	}
 	return nil
 }
 
-// VotingAuthority is a voting authority configuration.
-type VotingAuthority struct {
-	Peers []*vServerConfig.AuthorityPeer
-}
-
-// New constructs a pki.Client with the specified non-voting authority config.
-func (vACfg *VotingAuthority) New(l *log.Backend, pCfg *proxy.Config) (pki.Client, error) {
-	cfg := &vClient.Config{
-		LogBackend:    l,
-		Authorities:   vACfg.Peers,
-		DialContextFn: pCfg.ToDialContext("voting"),
-	}
-	return vClient.New(cfg)
-}
-
-func (vACfg *VotingAuthority) validate() error {
-	if vACfg.Peers == nil || len(vACfg.Peers) == 0 {
-		return errors.New("error VotingAuthority failure, must specify at least one peer")
-	}
-	for _, peer := range vACfg.Peers {
-		if peer.IdentityPublicKey == nil || peer.LinkPublicKey == nil || len(peer.Addresses) == 0 {
-			return errors.New("invalid voting authority peer")
-		}
-	}
-	return nil
-}
-
-// NewPKIClient returns a voting or nonvoting implementation of pki.Client or error
+// NewPKIClient returns a katzenmint implementation of pki.Client or error
 func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (pki.Client, error) {
-	switch {
-	case c.NonvotingAuthority != nil:
-		return c.NonvotingAuthority.New(l, pCfg)
-	case c.VotingAuthority != nil:
-		return c.VotingAuthority.New(l, pCfg)
+	//! Proxy unused, should we add it somewhere?
+	cfg := &minclient.PKIClientConfig{
+		LogBackend:   l,
+		TrustOptions: c.TendermintClient.TrustOptions,
+		Primary:      c.TendermintClient.Primary,
+		Witnesses:    c.TendermintClient.Witnesses,
+		TrustedStore: c.TendermintClient.TrustedStore,
+		Rpcaddress:   c.TendermintClient.Rpcaddress,
 	}
-	return nil, errors.New("no Authority found")
+	return minclient.NewPKIClient(cfg)
 }
 
 // Reunion is the Reunion configuration needed by clients
@@ -308,16 +275,15 @@ func (uCfg *UpstreamProxy) toProxyConfig() (*proxy.Config, error) {
 
 // Config is the top level client configuration.
 type Config struct {
-	Logging            *Logging
-	UpstreamProxy      *UpstreamProxy
-	Debug              *Debug
-	NonvotingAuthority *NonvotingAuthority
-	VotingAuthority    *VotingAuthority
-	Account            *Account
-	Registration       *Registration
-	Panda              *Panda
-	Reunion            *Reunion
-	upstreamProxy      *proxy.Config
+	Logging          *Logging
+	UpstreamProxy    *UpstreamProxy
+	Debug            *Debug
+	TendermintClient *TendermintClient
+	Account          *Account
+	Registration     *Registration
+	Panda            *Panda
+	Reunion          *Reunion
+	upstreamProxy    *proxy.Config
 }
 
 // UpstreamProxyConfig returns the configured upstream proxy, suitable for
@@ -351,17 +317,8 @@ func (c *Config) FixupAndMinimallyValidate() error {
 	} else {
 		return err
 	}
-	switch {
-	case c.NonvotingAuthority == nil && c.VotingAuthority != nil:
-		if err := c.VotingAuthority.validate(); err != nil {
-			return fmt.Errorf("config: NonvotingAuthority/VotingAuthority is invalid: %s", err)
-		}
-	case c.NonvotingAuthority != nil && c.VotingAuthority == nil:
-		if err := c.NonvotingAuthority.validate(); err != nil {
-			return fmt.Errorf("config: NonvotingAuthority/VotingAuthority is invalid: %s", err)
-		}
-	default:
-		return fmt.Errorf("config: Authority configuration is invalid")
+	if err := c.TendermintClient.validate(); err != nil {
+		return fmt.Errorf("config: TendermintClient is invalid: %v", err)
 	}
 
 	// Panda is optional

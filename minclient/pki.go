@@ -19,13 +19,11 @@ package minclient
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/katzenpost/core/epochtime"
 	cpki "github.com/katzenpost/core/pki"
-	"github.com/katzenpost/core/wire/commands"
 	"github.com/katzenpost/core/worker"
 	"gopkg.in/op/go-logging.v1"
 )
@@ -159,7 +157,7 @@ func (p *pki) worker() {
 				}
 			}()
 
-			d, err := p.getDocument(pkiCtx, epoch)
+			d, err := p.getDocumentDirect(pkiCtx, epoch)
 			if err != nil {
 				p.log.Warningf("Failed to fetch PKI for epoch %v: %v", epoch, err)
 				switch err {
@@ -178,11 +176,6 @@ func (p *pki) worker() {
 		if didUpdate {
 			// Prune documents.
 			p.pruneDocuments(now)
-
-			// Kick the connector iff it is waiting on a PKI document.
-			if p.c.conn != nil {
-				p.c.conn.onPKIFetch()
-			}
 		}
 		if now != lastCallbackEpoch && p.c.cfg.OnDocumentFn != nil {
 			if d, ok := p.docs.Load(now); ok {
@@ -197,46 +190,8 @@ func (p *pki) worker() {
 	// NOTREACHED
 }
 
-func (p *pki) getDocument(ctx context.Context, epoch uint64) (*cpki.Document, error) {
-	var d *cpki.Document
-	var err error
-
-	p.log.Debug("Fetching PKI doc for epoch %v from Provider.", epoch)
-	resp, err := p.c.conn.getConsensus(ctx, epoch)
-	switch err {
-	case nil:
-	case cpki.ErrNoDocument:
-		return nil, err
-	default:
-		p.log.Debugf("Failed to fetch PKI doc for epoch %v from Provider: %v", epoch, err)
-		return p.getDocumentDirect(ctx, epoch)
-	}
-
-	switch resp.ErrorCode {
-	case commands.ConsensusOk:
-	case commands.ConsensusGone:
-		return nil, cpki.ErrNoDocument
-	case commands.ConsensusNotFound:
-		return nil, errConsensusNotFound
-	default:
-		return nil, fmt.Errorf("minclient/pki: GetConsensus failed: %v", resp.ErrorCode)
-	}
-
-	d, err = p.c.cfg.PKIClient.Deserialize(resp.Payload)
-	if err != nil {
-		p.log.Errorf("Failed to deserialize consensus received from provider: %v", err)
-		return nil, cpki.ErrNoDocument
-	}
-	if d.Epoch != epoch {
-		p.log.Errorf("BUG: Provider returned document for incorrect epoch: %v", d.Epoch)
-		return p.getDocumentDirect(ctx, epoch)
-	}
-
-	return d, err
-}
-
 func (p *pki) getDocumentDirect(ctx context.Context, epoch uint64) (*cpki.Document, error) {
-	p.log.Debugf("Fetching PKI doc for epoch %v directly from authority.", epoch)
+	p.log.Debugf("Fetching PKI doc for epoch %v directly.", epoch)
 
 	d, _, err := p.c.cfg.PKIClient.Get(ctx, epoch)
 	select {
