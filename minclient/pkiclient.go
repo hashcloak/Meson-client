@@ -17,7 +17,7 @@ import (
 	lightrpc "github.com/tendermint/tendermint/light/rpc"
 	dbs "github.com/tendermint/tendermint/light/store/db"
 	"github.com/tendermint/tendermint/rpc/client/http"
-	"github.com/tendermint/tm-db/badgerdb"
+	dbm "github.com/tendermint/tm-db"
 	"gopkg.in/op/go-logging.v1"
 )
 
@@ -25,6 +25,7 @@ var _ cpki.Client = (*PKIClient)(nil)
 
 type PKIClientConfig struct {
 	LogBackend         *log.Backend
+	ChainID            string
 	TrustOptions       light.TrustOptions
 	PrimaryAddress     string
 	WitnessesAddresses []string
@@ -49,14 +50,14 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 		Payload: "",
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("cannot json marshal: %v", err)
 	}
 	p.log.Debugf("Query: %v", query)
 
 	// Make the abci query
 	resp, err := p.light.ABCIQuery(ctx, "TODO: /path", query)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("fail to abci query light client: %v", err)
 	}
 
 	// Check for response status
@@ -67,7 +68,7 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	// Verify and parse the document
 	doc, err := s11n.VerifyAndParseDocument(resp.Response.Value, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("fail to extract doc: %v", err)
 	}
 	if doc.Epoch != epoch {
 		p.log.Warningf("Get() returned pki document for wrong epoch: %v", doc.Epoch)
@@ -114,7 +115,7 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 		return err
 	}
 	if resp.Code != 0 {
-		return fmt.Errorf("Broadcast Tx returned with status code: %v", resp.Code)
+		return fmt.Errorf("broadcast Tx returned with status code: %v", resp.Code)
 	}
 	// TODO: Make sure to subscribe for events
 
@@ -144,26 +145,24 @@ func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
 	p := new(PKIClient)
 	p.log = cfg.LogBackend.GetLogger("pki/client")
 
-	db, err := badgerdb.NewDB(cfg.DatabaseName, cfg.DatabaseDir)
+	db, err := dbm.NewDB(cfg.DatabaseName, dbm.BadgerDBBackend, cfg.DatabaseDir)
 	if err != nil {
-		p.log.Errorf("Error opening katzenmint-pki database.")
+		return nil, fmt.Errorf("Error opening katzenmint-pki database: %v", err)
 	}
 	lightclient, err := light.NewHTTPClient(
 		context.Background(),
-		"TODO: chainID_of_katzenmint_pki",
+		cfg.ChainID,
 		cfg.TrustOptions,
 		cfg.PrimaryAddress,
 		cfg.WitnessesAddresses,
 		dbs.New(db, "katzenmint"),
 	)
 	if err != nil {
-		p.log.Errorf("Error initialization of katzenmint-pki light client.")
-		return nil, err
+		return nil, fmt.Errorf("Error initialization of katzenmint-pki light client: %v", err)
 	}
 	provider, err := http.New(cfg.RpcAddress, "/websocket")
 	if err != nil {
-		p.log.Errorf("Error connection to katzenmint-pki full node.")
-		return nil, err
+		return nil, fmt.Errorf("Error connection to katzenmint-pki full node: %v", err)
 	}
 
 	p.light = lightrpc.NewClient(provider, lightclient)

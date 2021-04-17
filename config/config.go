@@ -145,6 +145,7 @@ func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (pki.Client, e
 	//! Proxy unused, should we add it somewhere?
 	cfg := &minclient.PKIClientConfig{
 		LogBackend:         l,
+		ChainID:            "TODO: chainID_of_katzenmint_pki",
 		TrustOptions:       c.TendermintClient.TrustOptions,
 		PrimaryAddress:     c.TendermintClient.PrimaryAddress,
 		WitnessesAddresses: c.TendermintClient.WitnessesAddresses,
