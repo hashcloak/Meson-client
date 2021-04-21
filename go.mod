@@ -12,6 +12,9 @@ require (
 	github.com/katzenpost/core v0.0.11
 	github.com/katzenpost/minclient v0.0.6
 	github.com/katzenpost/registration_client v0.0.1
+	github.com/lib/pq v1.9.0 // indirect
+	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.6
 	github.com/tendermint/tm-db v0.6.4
