@@ -22,7 +22,7 @@ func TestQueue(t *testing.T) {
 	s, err := q.Pop()
 	assert.NoError(err)
 	assert.Equal(s.(foo).x, "hello")
-	s, err = q.Pop()
+	_, err = q.Pop()
 	assert.Error(err)
 
 	for i := 0; i < constants.MaxEgressQueueSize; i++ {

@@ -30,9 +30,9 @@ import (
 
 var (
 	errGetConsensusCanceled = errors.New("minclient/pki: consensus fetch canceled")
-	errConsensusNotFound    = errors.New("minclient/pki: consensus not ready yet")
-	nextFetchTill           = epochtime.Period / 8
-	recheckInterval         = 1 * time.Minute
+	// errConsensusNotFound    = errors.New("minclient/pki: consensus not ready yet")
+	nextFetchTill   = epochtime.Period / 8
+	recheckInterval = 1 * time.Minute
 	// WarpedEpoch is a build time flag that accelerates the recheckInterval
 	WarpedEpoch = "false"
 )

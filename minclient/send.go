@@ -151,7 +151,7 @@ func (c *Client) makePath(recipient, provider string, surbID *[sConstants.SURBID
 
 	p, t, err := path.New(c.rng, doc, []byte(recipient), src, dst, surbID, baseTime, true, isForward)
 	if err == nil {
-		c.logPath(doc, p)
+		_ = c.logPath(doc, p)
 	}
 
 	return p, t, err
