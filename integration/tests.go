@@ -49,6 +49,9 @@ func (s *TestSuite) signCosmosRawTxn() error {
 // signRawRawTransaction just signs a txn with
 func (s *TestSuite) signEthereumRawTxn() error {
 	ethclient, err := ethclient.Dial(*s.rpcURL)
+	if err != nil {
+		return err
+	}
 	key, err := crypto.HexToECDSA(*s.pk)
 	if err != nil {
 		return err
@@ -159,7 +162,7 @@ func main() {
 	if err != nil {
 		panic("ERROR In creating new client: " + err.Error())
 	}
-	client.Start()
+	_ = client.Start()
 	reply, err := client.SendRawTransaction(testSuite.signedTransaction, testSuite.ticker)
 	if err != nil {
 		panic("ERROR Send raw transaction: " + err.Error())

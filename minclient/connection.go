@@ -54,6 +54,7 @@ var (
 	pkiFallbackInterval = 3 * time.Minute
 )
 
+// TODO: replace panic code with other error code or recover pattern?
 // ConnectError is the error used to indicate that a connect attempt has failed.
 type ConnectError struct {
 	// Err is the original error that caused the connect attempt to fail.
@@ -138,16 +139,6 @@ func (c *Client) ForceFetch() {
 	select {
 	case c.conn.fetchCh <- true:
 	default:
-	}
-}
-
-func (c *connection) onPKIFetch() {
-	select {
-	case c.pkiFetchCh <- true:
-	default:
-		// Probably a connection is in progress, the right thing will happen
-		// regardless of if the signal gets dropped, though it might require
-		// the fallback timer to fire.
 	}
 }
 
@@ -359,7 +350,7 @@ func (c *connection) onTCPConn(conn net.Conn) {
 	defer w.Close()
 
 	// Bind the session to the conn, handshake, authenticate.
-	conn.SetDeadline(time.Now().Add(handshakeTimeout))
+	_ = conn.SetDeadline(time.Now().Add(handshakeTimeout))
 	if err = w.Initialize(conn); err != nil {
 		c.log.Errorf("Handshake failed: %v", err)
 		if c.c.cfg.OnConnFn != nil {
@@ -368,7 +359,7 @@ func (c *connection) onTCPConn(conn net.Conn) {
 		return
 	}
 	c.log.Debugf("Handshake completed.")
-	conn.SetDeadline(time.Time{})
+	_ = conn.SetDeadline(time.Time{})
 	c.c.pki.setClockSkew(int64(w.ClockSkew().Seconds()))
 
 	c.onWireConn(w)
@@ -695,53 +686,6 @@ func (c *connection) sendPacket(pkt []byte) error {
 	c.Unlock()
 
 	return <-errCh
-}
-
-func (c *connection) getConsensus(ctx context.Context, epoch uint64) (*commands.Consensus, error) {
-	c.Lock()
-	if !c.isConnected {
-		c.Unlock()
-		return nil, ErrNotConnected
-	}
-
-	errCh := make(chan error)
-	replyCh := make(chan interface{})
-	c.getConsensusCh <- &getConsensusCtx{
-		replyCh: replyCh,
-		epoch:   epoch,
-		doneFn: func(err error) {
-			errCh <- err
-		},
-	}
-	c.log.Debug("Enqueued GetConsensus command for send.")
-
-	// Release the lock so this won't deadlock in onConnStatusChange.
-	c.Unlock()
-
-	// Ensure the dispatch succeeded.
-	err := <-errCh
-	if err != nil {
-		c.log.Debugf("Failed to dispatch GetConsensus: %v", err)
-		return nil, err
-	}
-
-	// Wait for the dispatch to complete.
-	select {
-	case rawResp := <-replyCh:
-		switch resp := rawResp.(type) {
-		case error:
-			return nil, resp
-		case *commands.Consensus:
-			return resp, nil
-		default:
-			panic("BUG: Worker returned invalid Consensus response")
-		}
-	case <-ctx.Done():
-		// Canceled mid-fetch.
-		return nil, errGetConsensusCanceled
-	}
-
-	// NOTREACHED
 }
 
 func (c *connection) start() {
