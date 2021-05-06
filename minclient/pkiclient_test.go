@@ -1,8 +1,10 @@
 package minclient
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
+	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
 	stdlog "log"
@@ -11,18 +13,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger"
 	katzenmint "github.com/hashcloak/katzenmint-pki"
 	"github.com/hashcloak/katzenmint-pki/s11n"
 	"github.com/katzenpost/core/crypto/rand"
 	katlog "github.com/katzenpost/core/log"
-	cpki "github.com/katzenpost/core/pki"
 	"github.com/stretchr/testify/assert"
-	"github.com/tendermint/tendermint/abci/types"
+	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/light"
 	httpp "github.com/tendermint/tendermint/light/provider/http"
+	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/local"
 	rpctest "github.com/tendermint/tendermint/rpc/test"
+	dbm "github.com/tendermint/tm-db"
 )
 
 var (
@@ -31,31 +33,29 @@ var (
 )
 
 func TestGetDocument(t *testing.T) {
-	t.Log("Testing PKIClient Get()")
 	var (
-		assert            = assert.New(t)
-		config            = rpctest.GetConfig()
-		chainID           = config.ChainID()
-		rpcAddress        = config.RPC.ListenAddress
-		preHeight  int64  = 1
-		postHeight uint64 = 2
+		assert     = assert.New(t)
+		require    = require.New(t)
+		config     = rpctest.GetConfig()
+		chainID    = config.ChainID()
+		rpcAddress = config.RPC.ListenAddress
 	)
 
 	// Give Tendermint time to generate some blocks
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// Get an initial trusted block
 	primary, err := httpp.New(chainID, rpcAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
-	block, err := primary.LightBlock(context.Background(), preHeight)
+	block, err := primary.LightBlock(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	trustOptions := light.TrustOptions{
 		Period: 10 * time.Minute,
-		Height: preHeight,
+		Height: block.Height,
 		Hash:   block.Hash(),
 	}
 
@@ -79,20 +79,23 @@ func TestGetDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Push a document
-	// TODO: a suitable testing document
-	docTest := cpki.Document{
-		Epoch: postHeight,
-	}
-	docJson, err := json.Marshal(docTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Get the upcoming epoch
+	appInfo, err := abciClient.ABCIInfo(context.Background())
+	require.Nil(err)
+	infoData := katzenmint.DecodeHex(appInfo.Response.Data)
+	epoch, err := binary.ReadUvarint(bytes.NewReader(infoData))
+	require.Nil(err)
+	epoch += 1
+
+	// Create a document
+	_, docSer := katzenmint.CreateTestDocument(require, epoch)
+	docTest, err := s11n.VerifyAndParseDocument(docSer)
+	require.Nil(err)
 	rawTx := katzenmint.Transaction{
-		Version: s11n.DocumentVersion,
-		Epoch:   postHeight,
+		Version: katzenmint.ProtocolVersion,
+		Epoch:   epoch,
 		Command: katzenmint.AddConsensusDocument,
-		Payload: katzenmint.EncodeHex(docJson),
+		Payload: string(docSer),
 	}
 	_, privKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -103,39 +106,43 @@ func TestGetDocument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := abciClient.BroadcastTxSync(context.Background(), tx)
+
+	// Upload the document
+	resp, err := abciClient.BroadcastTxCommit(context.Background(), tx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(types.CodeTypeOK, resp.Code, "Failed to broadcast document")
+	assert.True(resp.CheckTx.IsOK(), "Failed to broadcast transaction")
+	assert.True(resp.DeliverTx.IsOK(), resp.DeliverTx.Log)
 
-	// Wait a while and try to get the document
-	time.Sleep(5 * time.Second)
-	doc, _, err := pkiClient.Get(context.Background(), postHeight)
-
-	// Output Validation
+	// Get the document and verify
+	time.Sleep(3 * time.Second)
+	err = rpcclient.WaitForHeight(abciClient, resp.Height+1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, _, err := pkiClient.Get(context.Background(), epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(docTest, doc, "Got an incorrect document")
+
+	// Try getting a non-existing document
+	_, _, err = pkiClient.Get(context.Background(), epoch+1)
+	assert.NotNil(err, "Got a document that should not exist")
 }
 
 func TestMain(m *testing.M) {
-	var db *badger.DB
 	var err error
 
-	// set up database for katzenmint node
+	// set up test directory
 	testDir, err = ioutil.TempDir("", "pkiclient_test")
-	if err != nil {
-		stdlog.Fatal(err)
-	}
-	path := filepath.Join(testDir, "fullnode_db")
-	db, err = badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		stdlog.Fatal(err)
 	}
 
 	// start katzenmint node in the background to test against
+	db := dbm.NewMemDB()
 	app := katzenmint.NewKatzenmintApplication(db)
 	node := rpctest.StartTendermint(app, rpctest.SuppressStdout)
 	abciClient = local.New(node)
@@ -144,6 +151,7 @@ func TestMain(m *testing.M) {
 
 	// and shut down properly at the end
 	rpctest.StopTendermint(node)
+	db.Close()
 	os.RemoveAll(testDir)
 	os.Exit(code)
 }

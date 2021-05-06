@@ -4,19 +4,20 @@ go 1.13
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/dgraph-io/badger v1.6.1
+	github.com/cosmos/iavl v0.15.3
 	github.com/ethereum/go-ethereum v1.9.10
 	github.com/hashcloak/Meson-plugin v0.0.0-20200208012317-7f72000d5e7b
-	github.com/hashcloak/katzenmint-pki v0.0.0-20210417152737-82b9ff52b2cd
+	github.com/hashcloak/katzenmint-pki v0.0.0-20210506091450-e51a69f432ee
 	github.com/katzenpost/client v0.0.3
-	github.com/katzenpost/core v0.0.11
+	github.com/katzenpost/core v0.0.12
 	github.com/katzenpost/minclient v0.0.6
+	github.com/katzenpost/noise v0.0.2 // indirect
 	github.com/katzenpost/registration_client v0.0.1
 	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/stretchr/testify v1.7.0
-	github.com/tendermint/tendermint v0.34.6
+	github.com/tendermint/tendermint v0.34.10
 	github.com/tendermint/tm-db v0.6.4
 	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
 	golang.org/x/text v0.3.4

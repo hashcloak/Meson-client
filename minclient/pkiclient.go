@@ -8,14 +8,17 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/cosmos/iavl"
 	kpki "github.com/hashcloak/katzenmint-pki"
 	"github.com/hashcloak/katzenmint-pki/s11n"
 	"github.com/katzenpost/core/crypto/eddsa"
 	"github.com/katzenpost/core/log"
 	cpki "github.com/katzenpost/core/pki"
+	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/light"
 	lightrpc "github.com/tendermint/tendermint/light/rpc"
 	dbs "github.com/tendermint/tendermint/light/store/db"
+	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/http"
 	dbm "github.com/tendermint/tm-db"
 	"gopkg.in/op/go-logging.v1"
@@ -43,19 +46,21 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	p.log.Debugf("Get(ctx, %d)", epoch)
 
 	// Form the abci query
-	query, err := json.Marshal(kpki.Query{
-		Version: "1",
+	query := kpki.Query{
+		Version: kpki.ProtocolVersion,
 		Epoch:   epoch,
 		Command: kpki.GetConsensus,
 		Payload: "",
-	})
+	}
+	data, err := kpki.EncodeJson(query)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot json marshal: %v", err)
+		return nil, nil, fmt.Errorf("cannot json encode: %v", err)
 	}
 	p.log.Debugf("Query: %v", query)
 
 	// Make the abci query
-	resp, err := p.light.ABCIQuery(ctx, "TODO: /path", query)
+	opts := rpcclient.ABCIQueryOptions{Prove: true}
+	resp, err := p.light.ABCIQueryWithOptions(ctx, "", data, opts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to abci query light client: %v", err)
 	}
@@ -66,7 +71,7 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	}
 
 	// Verify and parse the document
-	doc, err := s11n.VerifyAndParseDocument(resp.Response.Value, nil)
+	doc, err := s11n.VerifyAndParseDocument(resp.Response.Value)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fail to extract doc: %v", err)
 	}
@@ -138,7 +143,7 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 }
 
 func (p *PKIClient) Deserialize(raw []byte) (*cpki.Document, error) {
-	return s11n.VerifyAndParseDocument(raw, nil)
+	return s11n.VerifyAndParseDocument(raw)
 }
 
 func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
@@ -164,7 +169,12 @@ func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Error connection to katzenmint-pki full node: %v", err)
 	}
-
-	p.light = lightrpc.NewClient(provider, lightclient)
+	kpFunc := lightrpc.KeyPathFn(func(_ string, key []byte) (merkle.KeyPath, error) {
+		kp := merkle.KeyPath{}
+		kp = kp.AppendKey(key, merkle.KeyEncodingURL)
+		return kp, nil
+	})
+	p.light = lightrpc.NewClient(provider, lightclient, kpFunc)
+	p.light.RegisterOpDecoder(iavl.ProofOpIAVLValue, iavl.ValueOpDecoder)
 	return p, nil
 }
