@@ -13,8 +13,9 @@ import (
 	"testing"
 	"time"
 
-	katzenmint "github.com/hashcloak/katzenmint-pki"
+	kpki "github.com/hashcloak/katzenmint-pki"
 	"github.com/hashcloak/katzenmint-pki/s11n"
+	"github.com/hashcloak/katzenmint-pki/testutil"
 	"github.com/katzenpost/core/crypto/rand"
 	katlog "github.com/katzenpost/core/log"
 	"github.com/stretchr/testify/assert"
@@ -82,19 +83,19 @@ func TestGetDocument(t *testing.T) {
 	// Get the upcoming epoch
 	appInfo, err := abciClient.ABCIInfo(context.Background())
 	require.Nil(err)
-	infoData := katzenmint.DecodeHex(appInfo.Response.Data)
+	infoData := kpki.DecodeHex(appInfo.Response.Data)
 	epoch, err := binary.ReadUvarint(bytes.NewReader(infoData))
 	require.Nil(err)
 	epoch += 1
 
 	// Create a document
-	_, docSer := katzenmint.CreateTestDocument(require, epoch)
+	_, docSer := testutil.CreateTestDocument(require, epoch)
 	docTest, err := s11n.VerifyAndParseDocument(docSer)
 	require.Nil(err)
-	rawTx := katzenmint.Transaction{
-		Version: katzenmint.ProtocolVersion,
+	rawTx := kpki.Transaction{
+		Version: kpki.ProtocolVersion,
 		Epoch:   epoch,
-		Command: katzenmint.AddConsensusDocument,
+		Command: kpki.AddConsensusDocument,
 		Payload: string(docSer),
 	}
 	_, privKey, err := ed25519.GenerateKey(rand.Reader)
@@ -143,7 +144,7 @@ func TestMain(m *testing.M) {
 
 	// start katzenmint node in the background to test against
 	db := dbm.NewMemDB()
-	app := katzenmint.NewKatzenmintApplication(db)
+	app := kpki.NewKatzenmintApplication(db)
 	node := rpctest.StartTendermint(app, rpctest.SuppressStdout)
 	abciClient = local.New(node)
 

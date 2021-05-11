@@ -308,8 +308,8 @@ github.com/gtank/ristretto255 v0.1.2 h1:JEqUCPA1NvLq5DwYtuzigd7ss8fwbYay9fi4/5uM
 github.com/gtank/ristretto255 v0.1.2/go.mod h1:Ph5OpO6c7xKUGROZfWVLiJf9icMDwUeIvY4OmlYW69o=
 github.com/hashcloak/Meson-plugin v0.0.0-20200208012317-7f72000d5e7b h1:WZ3qeje2hAbMHK4KeG5lIQ7oDne9ReLnfmnuZ54cWvk=
 github.com/hashcloak/Meson-plugin v0.0.0-20200208012317-7f72000d5e7b/go.mod h1:e/7JZLFdHyN74nwaqdz68OF2r0gMFYtyY7pf+kax+fM=
-github.com/hashcloak/katzenmint-pki v0.0.0-20210506091450-e51a69f432ee h1:fVIwbvImcRA1ygnHaZm4aNB/mXABe0TXIWjQf8ZJCn4=
-github.com/hashcloak/katzenmint-pki v0.0.0-20210506091450-e51a69f432ee/go.mod h1:0VWsCnqS6SSkbDWBSgswgQrELZWPfBDeRSskr0lkL5Q=
+github.com/hashcloak/katzenmint-pki v0.0.0-20210511073018-fe827a9c9fdb h1:a+XxJEPDtt8xBx6eAQz6ukdK+0udy7O9g9ILIwJ8Z7Q=
+github.com/hashcloak/katzenmint-pki v0.0.0-20210511073018-fe827a9c9fdb/go.mod h1:0VWsCnqS6SSkbDWBSgswgQrELZWPfBDeRSskr0lkL5Q=
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
 github.com/hashicorp/consul/api v1.3.0/go.mod h1:MmDNSzIMUjNpY/mQ398R4bk2FnqQLoPndWW5VkKPlCE=
 github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
