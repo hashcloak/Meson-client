@@ -20,6 +20,7 @@ import (
 	katlog "github.com/katzenpost/core/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	log "github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/light"
 	httpp "github.com/tendermint/tendermint/light/provider/http"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
@@ -32,6 +33,11 @@ var (
 	testDir    string
 	abciClient *local.Local
 )
+
+func newDiscardLogger() (logger log.Logger) {
+	logger = log.NewTMLogger(log.NewSyncWriter(ioutil.Discard))
+	return
+}
 
 func TestGetDocument(t *testing.T) {
 	var (
@@ -144,7 +150,8 @@ func TestMain(m *testing.M) {
 
 	// start katzenmint node in the background to test against
 	db := dbm.NewMemDB()
-	app := kpki.NewKatzenmintApplication(db)
+	logger := newDiscardLogger()
+	app := kpki.NewKatzenmintApplication(db, logger)
 	node := rpctest.StartTendermint(app, rpctest.SuppressStdout)
 	abciClient = local.New(node)
 
