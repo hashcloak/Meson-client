@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	log "github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/light"
-	httpp "github.com/tendermint/tendermint/light/provider/http"
+	"github.com/tendermint/tendermint/light/provider/http"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/local"
 	rpctest "github.com/tendermint/tendermint/rpc/test"
@@ -52,14 +52,12 @@ func TestGetDocument(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Get an initial trusted block
-	primary, err := httpp.New(chainID, rpcAddress)
-	if err != nil {
-		t.Fatal(err)
-	}
+	primary, err := http.New(chainID, rpcAddress)
+	assert.NoError(err)
+
 	block, err := primary.LightBlock(context.Background(), 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	trustOptions := light.TrustOptions{
 		Period: 10 * time.Minute,
 		Height: block.Height,
@@ -69,9 +67,8 @@ func TestGetDocument(t *testing.T) {
 	// Setup a pki client
 	logPath := filepath.Join(testDir, "pkiclient_log")
 	logBackend, err := katlog.New(logPath, "INFO", false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	pkiClient, err := NewPKIClient(&PKIClientConfig{
 		LogBackend:         logBackend,
 		ChainID:            chainID,
@@ -82,22 +79,20 @@ func TestGetDocument(t *testing.T) {
 		DatabaseDir:        testDir,
 		RpcAddress:         rpcAddress,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// Get the upcoming epoch
 	appInfo, err := abciClient.ABCIInfo(context.Background())
-	require.Nil(err)
+	assert.NoError(err)
 	infoData := kpki.DecodeHex(appInfo.Response.Data)
 	epoch, err := binary.ReadUvarint(bytes.NewReader(infoData))
-	require.Nil(err)
+	assert.NoError(err)
 	epoch += 1
 
 	// Create a document
 	_, docSer := testutil.CreateTestDocument(require, epoch)
 	docTest, err := s11n.VerifyAndParseDocument(docSer)
-	require.Nil(err)
+	assert.NoError(err)
 	rawTx := kpki.Transaction{
 		Version: kpki.ProtocolVersion,
 		Epoch:   epoch,
@@ -105,33 +100,25 @@ func TestGetDocument(t *testing.T) {
 		Payload: string(docSer),
 	}
 	_, privKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	rawTx.AppendSignature(privKey)
 	tx, err := json.Marshal(rawTx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// Upload the document
 	resp, err := abciClient.BroadcastTxCommit(context.Background(), tx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	assert.True(resp.CheckTx.IsOK(), "Failed to broadcast transaction")
 	assert.True(resp.DeliverTx.IsOK(), resp.DeliverTx.Log)
 
 	// Get the document and verify
 	time.Sleep(3 * time.Second)
 	err = rpcclient.WaitForHeight(abciClient, resp.Height+1, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	doc, _, err := pkiClient.Get(context.Background(), epoch)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 	assert.Equal(docTest, doc, "Got an incorrect document")
 
 	// Try getting a non-existing document
