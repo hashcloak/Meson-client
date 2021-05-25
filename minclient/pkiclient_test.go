@@ -39,6 +39,15 @@ func newDiscardLogger() (logger log.Logger) {
 	return
 }
 
+func getEpoch(assert *assert.Assertions) uint64 {
+	appInfo, err := abciClient.ABCIInfo(context.Background())
+	assert.NoError(err)
+	epochByt := kpki.DecodeHex(appInfo.Response.Data)
+	epoch, err := binary.ReadUvarint(bytes.NewReader(epochByt))
+	assert.NoError(err)
+	return epoch
+}
+
 func TestGetDocument(t *testing.T) {
 	var (
 		assert     = assert.New(t)
@@ -82,17 +91,14 @@ func TestGetDocument(t *testing.T) {
 	assert.NoError(err)
 
 	// Get the upcoming epoch
-	appInfo, err := abciClient.ABCIInfo(context.Background())
-	assert.NoError(err)
-	infoData := kpki.DecodeHex(appInfo.Response.Data)
-	epoch, err := binary.ReadUvarint(bytes.NewReader(infoData))
-	assert.NoError(err)
+	epoch := getEpoch(assert)
 	epoch += 1
 
 	// Create a document
 	_, docSer := testutil.CreateTestDocument(require, epoch)
 	docTest, err := s11n.VerifyAndParseDocument(docSer)
 	assert.NoError(err)
+
 	rawTx := kpki.Transaction{
 		Version: kpki.ProtocolVersion,
 		Epoch:   epoch,
@@ -111,6 +117,7 @@ func TestGetDocument(t *testing.T) {
 	assert.NoError(err)
 	assert.True(resp.CheckTx.IsOK(), "Failed to broadcast transaction")
 	assert.True(resp.DeliverTx.IsOK(), resp.DeliverTx.Log)
+	t.Log(resp.DeliverTx.Code)
 
 	// Get the document and verify
 	time.Sleep(3 * time.Second)

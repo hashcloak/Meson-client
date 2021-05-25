@@ -54,7 +54,7 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	}
 	data, err := kpki.EncodeJson(query)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot json encode: %v", err)
+		return nil, nil, fmt.Errorf("failed to encode data: %v", err)
 	}
 	p.log.Debugf("Query: %v", query)
 
@@ -62,7 +62,7 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	opts := rpcclient.ABCIQueryOptions{Prove: true}
 	resp, err := p.light.ABCIQueryWithOptions(ctx, "", data, opts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to abci query light client: %v", err)
+		return nil, nil, fmt.Errorf("failed to query katzenmint pki: %v", err)
 	}
 
 	// Check for response status
@@ -73,7 +73,7 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	// Verify and parse the document
 	doc, err := s11n.VerifyAndParseDocument(resp.Response.Value)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to extract doc: %v", err)
+		return nil, nil, fmt.Errorf("failed to extract doc: %v", err)
 	}
 	if doc.Epoch != epoch {
 		p.log.Warningf("Get() returned pki document for wrong epoch: %v", doc.Epoch)
