@@ -150,7 +150,7 @@ func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
 	p := new(PKIClient)
 	p.log = cfg.LogBackend.GetLogger("pki/client")
 
-	db, err := dbm.NewDB(cfg.DatabaseName, dbm.BadgerDBBackend, cfg.DatabaseDir)
+	db, err := dbm.NewDB(cfg.DatabaseName, dbm.GoLevelDBBackend, cfg.DatabaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("Error opening katzenmint-pki database: %v", err)
 	}

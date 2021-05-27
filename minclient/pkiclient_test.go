@@ -58,7 +58,7 @@ func TestGetDocument(t *testing.T) {
 	)
 
 	// Give Tendermint time to generate some blocks
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Get an initial trusted block
 	primary, err := http.New(chainID, rpcAddress)
@@ -120,7 +120,6 @@ func TestGetDocument(t *testing.T) {
 	t.Log(resp.DeliverTx.Code)
 
 	// Get the document and verify
-	time.Sleep(3 * time.Second)
 	err = rpcclient.WaitForHeight(abciClient, resp.Height+1, nil)
 	assert.NoError(err)
 

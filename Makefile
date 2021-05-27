@@ -1,5 +1,4 @@
 GOPATH=$(shell go env GOPATH)
-GOTAGS="badgerdb"
 
 .PHONY: default
 default: lint test
@@ -13,4 +12,4 @@ lint:
 
 .PHONY: test
 test:
-	go test -tags=$(GOTAGS) -race ./...
+	go test -race ./...
