@@ -5,7 +5,6 @@ package minclient
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 
 	"github.com/cosmos/iavl"
@@ -20,11 +19,10 @@ import (
 	dbs "github.com/tendermint/tendermint/light/store/db"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	"github.com/tendermint/tendermint/rpc/client/http"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	dbm "github.com/tendermint/tm-db"
 	"gopkg.in/op/go-logging.v1"
 )
-
-var _ cpki.Client = (*PKIClient)(nil)
 
 type PKIClientConfig struct {
 	LogBackend         *log.Backend
@@ -38,10 +36,13 @@ type PKIClientConfig struct {
 }
 
 type PKIClient struct {
+	// TODO: do we need katzenpost pki client interface?
+	// cpki.Client
 	light *lightrpc.Client
 	log   *logging.Logger
 }
 
+// Get returns the PKI document along with the raw serialized form for the provided epoch.
 func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []byte, error) {
 	p.log.Debugf("Get(ctx, %d)", epoch)
 
@@ -84,6 +85,7 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	return doc, resp.Response.Value, nil
 }
 
+// Post posts the node's descriptor to the PKI for the provided epoch.
 func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.PrivateKey, d *cpki.MixDescriptor) error {
 	p.log.Debugf("Post(ctx, %d, %v, %+v)", epoch, signingKey.PublicKey(), d)
 
@@ -108,7 +110,7 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 	}
 	// ! Problemsome here
 	rawTx.AppendSignature(ed25519.PrivateKey(signingKey.Bytes()))
-	tx, err := json.Marshal(rawTx)
+	tx, err := kpki.EncodeJson(rawTx)
 	if err != nil {
 		return err
 	}
@@ -142,12 +144,41 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 	return nil
 }
 
+// PostTx posts the transaction to the katzenmint node.
+func (p *PKIClient) PostTx(ctx context.Context, tx kpki.Transaction) (*ctypes.ResultBroadcastTxCommit, error) {
+	p.log.Debugf("PostTx(ctx, %d)", tx.Epoch)
+
+	if !tx.IsVerified() {
+		return nil, fmt.Errorf("transaction is not verified, did you forget signing?")
+	}
+
+	encTx, err := kpki.EncodeJson(tx)
+	if err != nil {
+		return nil, err
+	}
+	p.log.Debugf("Transaction: '%v'", tx)
+
+	// Broadcast the abci transaction
+	resp, err := p.light.BroadcastTxCommit(ctx, encTx)
+	if err != nil {
+		return resp, err
+	}
+	if !resp.CheckTx.IsOK() {
+		return resp, fmt.Errorf("send transaction failed at checking tx")
+	}
+	if !resp.DeliverTx.IsOK() {
+		return resp, fmt.Errorf("send transaction failed at delivering tx")
+	}
+	return resp, nil
+}
+
+// Deserialize returns PKI document given the raw bytes.
 func (p *PKIClient) Deserialize(raw []byte) (*cpki.Document, error) {
 	return s11n.VerifyAndParseDocument(raw)
 }
 
 // NewPKIClient create PKI Client from PKI config
-func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
+func NewPKIClient(cfg *PKIClientConfig) (*PKIClient, error) {
 	p := new(PKIClient)
 	p.log = cfg.LogBackend.GetLogger("pki/client")
 

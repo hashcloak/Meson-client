@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	stdlog "log"
@@ -125,15 +124,11 @@ func TestGetDocument(t *testing.T) {
 	require.NoError(err)
 
 	rawTx.AppendSignature(privKey)
-	tx, err := json.Marshal(rawTx)
-	require.NoError(err)
 
 	// Upload the document
-	resp, err := abciClient.BroadcastTxCommit(context.Background(), tx)
+	resp, err := pkiClient.PostTx(context.Background(), rawTx)
 	require.NoError(err)
-	assert.True(resp.CheckTx.IsOK(), "Failed to broadcast transaction")
-	assert.True(resp.DeliverTx.IsOK(), resp.DeliverTx.Log)
-	t.Log(resp.DeliverTx.Code)
+	require.NotNil(resp)
 
 	// Get the document and verify
 	err = rpcclient.WaitForHeight(abciClient, resp.Height+1, nil)
