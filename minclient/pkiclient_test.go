@@ -251,7 +251,7 @@ func TestMockPKIClientGetDocument(t *testing.T) {
 	rawQuery, err := kpki.EncodeJson(query)
 	require.NoError(err)
 
-	// make the abci query
+	// moke the abci query
 	next := &rpcmock.Client{}
 	next.On(
 		"ABCIQueryWithOptions",
@@ -318,6 +318,43 @@ func TestMockPKIClientGetDocument(t *testing.T) {
 
 	// test get document with pki client
 	doc, _, err := pkiClient.Get(context.Background(), epoch)
+	require.NoError(err)
+	require.Equal(doc, testDoc)
+}
+
+// TestDeserialize tests PKI Client deserialize document.
+func TestDeserialize(t *testing.T) {
+	var (
+		require        = require.New(t)
+		epoch   uint64 = 1
+	)
+
+	// create a test document
+	_, docSer := testutil.CreateTestDocument(require, epoch)
+	testDoc, err := s11n.VerifyAndParseDocument(docSer)
+	require.NoError(err)
+
+	// make the abci query
+	next := &rpcmock.Client{}
+
+	// initialize pki client with light client
+	lc := &lcmock.LightClient{}
+
+	c := lightrpc.NewClient(next, lc,
+		lightrpc.KeyPathFn(func(_ string, key []byte) (merkle.KeyPath, error) {
+			kp := merkle.KeyPath{}
+			return kp, nil
+		}))
+
+	logPath := filepath.Join(testDir, "pkiclient_log")
+	logBackend, err := katlog.New(logPath, "INFO", true)
+	require.NoError(err)
+
+	pkiClient, err := NewPKIClientFromLightClient(c, logBackend)
+	require.NoError(err)
+	require.NotNil(pkiClient)
+
+	doc, err := pkiClient.Deserialize(docSer)
 	require.NoError(err)
 	require.Equal(doc, testDoc)
 }
