@@ -146,6 +146,7 @@ func (p *PKIClient) Deserialize(raw []byte) (*cpki.Document, error) {
 	return s11n.VerifyAndParseDocument(raw)
 }
 
+// NewPKIClient create PKI Client from PKI config
 func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
 	p := new(PKIClient)
 	p.log = cfg.LogBackend.GetLogger("pki/client")
@@ -175,6 +176,15 @@ func NewPKIClient(cfg *PKIClientConfig) (cpki.Client, error) {
 		return kp, nil
 	})
 	p.light = lightrpc.NewClient(provider, lightclient, kpFunc)
+	p.light.RegisterOpDecoder(iavl.ProofOpIAVLValue, iavl.ValueOpDecoder)
+	return p, nil
+}
+
+// NewPKIClientFromLightClient create PKI Client from tendermint rpc light client
+func NewPKIClientFromLightClient(light *lightrpc.Client, logBackend *log.Backend) (cpki.Client, error) {
+	p := new(PKIClient)
+	p.log = logBackend.GetLogger("pki/client")
+	p.light = light
 	p.light.RegisterOpDecoder(iavl.ProofOpIAVLValue, iavl.ValueOpDecoder)
 	return p, nil
 }
