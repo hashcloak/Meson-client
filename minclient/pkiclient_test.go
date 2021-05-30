@@ -317,6 +317,67 @@ func TestMockPKIClientGetDocument(t *testing.T) {
 	require.Equal(doc, testDoc)
 }
 
+// TestMockPKIClientPostTx tests PKI Client post transaction and verifies proofs.
+func TestMockPKIClientPostTx(t *testing.T) {
+	var (
+		require        = require.New(t)
+		epoch   uint64 = 1
+	)
+
+	// create a test document
+	_, docSer := testutil.CreateTestDocument(require, epoch)
+	testDoc, err := s11n.VerifyAndParseDocument(docSer)
+	require.NoError(err)
+	require.NotNil(testDoc)
+
+	rawTx := kpki.Transaction{
+		Version: kpki.ProtocolVersion,
+		Epoch:   epoch,
+		Command: kpki.AddConsensusDocument,
+		Payload: string(docSer),
+	}
+	_, privKey, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(err)
+	rawTx.AppendSignature(privKey)
+	tx, err := kpki.EncodeJson(rawTx)
+	require.NoError(err)
+
+	// moke the abci broadcast commit
+	next := &rpcmock.Client{}
+	tmtx := make(types.Tx, len(tx))
+	n := copy(tmtx, tx)
+	require.Equal(len(tx), n)
+	next.On(
+		"BroadcastTxCommit",
+		context.Background(),
+		tmtx,
+	).Return(&ctypes.ResultBroadcastTxCommit{
+		CheckTx:   abci.ResponseCheckTx{Code: 0, GasWanted: 1},
+		DeliverTx: abci.ResponseDeliverTx{Code: 0},
+	}, nil)
+
+	// initialize pki client with light client
+	lc := &lcmock.LightClient{}
+	require.NoError(err)
+
+	c := lightrpc.NewClient(next, lc,
+		lightrpc.KeyPathFn(func(_ string, key []byte) (merkle.KeyPath, error) {
+			kp := merkle.KeyPath{}
+			return kp, nil
+		}))
+
+	logPath := filepath.Join(testDir, "pkiclient_log")
+	logBackend, err := katlog.New(logPath, "INFO", true)
+	require.NoError(err)
+
+	pkiClient, err := NewPKIClientFromLightClient(c, logBackend)
+	require.NoError(err)
+	require.NotNil(pkiClient)
+
+	_, err = pkiClient.PostTx(context.Background(), rawTx)
+	require.NoError(err)
+}
+
 // TestDeserialize tests PKI Client deserialize document.
 func TestDeserialize(t *testing.T) {
 	var (

@@ -212,7 +212,7 @@ func NewPKIClient(cfg *PKIClientConfig) (*PKIClient, error) {
 }
 
 // NewPKIClientFromLightClient create PKI Client from tendermint rpc light client
-func NewPKIClientFromLightClient(light *lightrpc.Client, logBackend *log.Backend) (cpki.Client, error) {
+func NewPKIClientFromLightClient(light *lightrpc.Client, logBackend *log.Backend) (*PKIClient, error) {
 	p := new(PKIClient)
 	p.log = logBackend.GetLogger("pki/client")
 	p.light = light
