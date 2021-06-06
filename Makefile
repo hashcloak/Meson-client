@@ -13,3 +13,7 @@ lint:
 .PHONY: test
 test:
 	go test -race ./...
+
+.PHONY: integration
+integration:
+	go test --tags integration -race ./...
