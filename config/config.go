@@ -121,7 +121,7 @@ type TendermintClient struct {
 	WitnessesAddresses []string
 	DatabaseName       string
 	DatabaseDir        string
-	RpcAddress         string
+	RPCAddress         string
 }
 
 func (tcCfg *TendermintClient) validate() error {
@@ -134,7 +134,7 @@ func (tcCfg *TendermintClient) validate() error {
 	if tcCfg.DatabaseName == "" || tcCfg.DatabaseDir == "" {
 		return errors.New("Database name or directory is missing")
 	}
-	if tcCfg.RpcAddress == "" {
+	if tcCfg.RPCAddress == "" {
 		return errors.New("RPC address is missing")
 	}
 	return nil
@@ -151,7 +151,7 @@ func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (pki.Client, e
 		WitnessesAddresses: c.TendermintClient.WitnessesAddresses,
 		DatabaseName:       c.TendermintClient.DatabaseName,
 		DatabaseDir:        c.TendermintClient.DatabaseDir,
-		RpcAddress:         c.TendermintClient.RpcAddress,
+		RPCAddress:         c.TendermintClient.RPCAddress,
 	}
 	return minclient.NewPKIClient(cfg)
 }

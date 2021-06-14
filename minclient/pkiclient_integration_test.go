@@ -78,7 +78,7 @@ func TestGetDocument(t *testing.T) {
 		WitnessesAddresses: []string{rpcAddress},
 		DatabaseName:       "pkiclient_db",
 		DatabaseDir:        testDir,
-		RpcAddress:         rpcAddress,
+		RPCAddress:         rpcAddress,
 	})
 	require.NoError(err)
 

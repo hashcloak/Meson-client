@@ -32,7 +32,7 @@ type PKIClientConfig struct {
 	WitnessesAddresses []string
 	DatabaseName       string
 	DatabaseDir        string
-	RpcAddress         string
+	RPCAddress         string
 }
 
 type PKIClient struct {
@@ -197,7 +197,7 @@ func NewPKIClient(cfg *PKIClientConfig) (*PKIClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Error initialization of katzenmint-pki light client: %v", err)
 	}
-	provider, err := http.New(cfg.RpcAddress, "/websocket")
+	provider, err := http.New(cfg.RPCAddress, "/websocket")
 	if err != nil {
 		return nil, fmt.Errorf("Error connection to katzenmint-pki full node: %v", err)
 	}
