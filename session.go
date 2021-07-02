@@ -27,17 +27,17 @@ import (
 	"time"
 
 	"github.com/hashcloak/Meson-client/config"
-	"github.com/hashcloak/Meson-client/internal/pkiclient"
+	"github.com/hashcloak/Meson-client/minclient"
+	kpki "github.com/hashcloak/Meson-client/pkiclient"
 	cConstants "github.com/katzenpost/client/constants"
 	"github.com/katzenpost/client/utils"
 	coreConstants "github.com/katzenpost/core/constants"
 	"github.com/katzenpost/core/crypto/ecdh"
 	"github.com/katzenpost/core/log"
-	"github.com/katzenpost/core/pki"
+	cpki "github.com/katzenpost/core/pki"
 	"github.com/katzenpost/core/sphinx"
 	sConstants "github.com/katzenpost/core/sphinx/constants"
 	"github.com/katzenpost/core/worker"
-	"github.com/katzenpost/minclient"
 	"gopkg.in/eapache/channels.v1"
 	"gopkg.in/op/go-logging.v1"
 )
@@ -47,7 +47,7 @@ type Session struct {
 	worker.Worker
 
 	cfg       *config.Config
-	pkiClient pki.Client
+	pkiClient kpki.Client
 	minclient *minclient.Client
 	log       *logging.Logger
 
@@ -93,7 +93,7 @@ func NewSession(
 	if err != nil {
 		return nil, err
 	}
-	pkiCacheClient := pkiclient.New(pkiClient2)
+	pkiCacheClient := kpki.NewCacheClient(pkiClient2)
 
 	clientLog := logBackend.GetLogger(fmt.Sprintf("%s@%s_client", cfg.Account.User, cfg.Account.Provider))
 
@@ -311,7 +311,7 @@ func (s *Session) onACK(surbID *[sConstants.SURBIDLength]byte, ciphertext []byte
 	return nil
 }
 
-func (s *Session) onDocument(doc *pki.Document) {
+func (s *Session) onDocument(doc *cpki.Document) {
 	s.log.Debugf("onDocument(): Epoch %v", doc.Epoch)
 	s.hasPKIDoc = true
 	s.opCh <- opNewDocument{
@@ -322,7 +322,7 @@ func (s *Session) onDocument(doc *pki.Document) {
 	}
 }
 
-func (s *Session) CurrentDocument() *pki.Document {
+func (s *Session) CurrentDocument() *cpki.Document {
 	return s.minclient.CurrentDocument()
 }
 

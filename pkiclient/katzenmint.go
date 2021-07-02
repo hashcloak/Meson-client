@@ -1,10 +1,11 @@
-// pkiclient.go - katzenmint implementation of katzenpost PKIClient interface
+// katzenmint pkiclient implementation
 
-package minclient
+package pkiclient
 
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/cosmos/iavl"
@@ -42,20 +43,17 @@ type PKIClient struct {
 	log   *logging.Logger
 }
 
-// Get returns the PKI document along with the raw serialized form for the provided epoch.
-func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []byte, error) {
-	p.log.Debugf("Get(ctx, %d)", epoch)
-
+func (p *PKIClient) query(ctx context.Context, epoch uint64, command kpki.Command) (*ctypes.ResultABCIQuery, error) {
 	// Form the abci query
 	query := kpki.Query{
 		Version: kpki.ProtocolVersion,
 		Epoch:   epoch,
-		Command: kpki.GetConsensus,
+		Command: command,
 		Payload: "",
 	}
 	data, err := kpki.EncodeJson(query)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to encode data: %v", err)
+		return nil, fmt.Errorf("failed to encode data: %v", err)
 	}
 	p.log.Debugf("Query: %v", query)
 
@@ -63,10 +61,39 @@ func (p *PKIClient) Get(ctx context.Context, epoch uint64) (*cpki.Document, []by
 	opts := rpcclient.ABCIQueryOptions{Prove: true}
 	resp, err := p.light.ABCIQueryWithOptions(ctx, "", data, opts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to query katzenmint pki: %v", err)
+		return nil, fmt.Errorf("failed to query katzenmint pki: %v", err)
 	}
+	return resp, nil
+}
 
-	// Check for response status
+// GetEpoch returns the epoch information of PKI.
+func (p *PKIClient) GetEpoch(ctx context.Context) (epoch uint64, startHeight int64, err error) {
+	resp, err := p.query(ctx, 0, kpki.GetEpoch)
+	if err != nil {
+		return
+	}
+	if resp.Response.Code != 0 {
+		err = fmt.Errorf(resp.Response.Log)
+		return
+	}
+	if len(resp.Response.Value) != 16 {
+		err = fmt.Errorf("retrieved epoch information has incorrect format")
+		return
+	}
+	epoch, _ = binary.Uvarint(resp.Response.Value[:8])
+	startHeight, _ = binary.Varint(resp.Response.Value[8:16])
+	return
+}
+
+// GetDoc returns the PKI document along with the raw serialized form for the provided epoch.
+func (p *PKIClient) GetDoc(ctx context.Context, epoch uint64) (*cpki.Document, []byte, error) {
+	p.log.Debugf("Get(ctx, %d)", epoch)
+
+	// Make the query
+	resp, err := p.query(ctx, epoch, kpki.GetConsensus)
+	if err != nil {
+		return nil, nil, err
+	}
 	if resp.Response.Code != 0 {
 		return nil, nil, cpki.ErrNoDocument
 	}
@@ -184,7 +211,7 @@ func NewPKIClient(cfg *PKIClientConfig) (*PKIClient, error) {
 
 	db, err := dbm.NewDB(cfg.DatabaseName, dbm.GoLevelDBBackend, cfg.DatabaseDir)
 	if err != nil {
-		return nil, fmt.Errorf("Error opening katzenmint-pki database: %v", err)
+		return nil, fmt.Errorf("error opening katzenmint-pki database: %v", err)
 	}
 	lightclient, err := light.NewHTTPClient(
 		context.Background(),
@@ -195,11 +222,11 @@ func NewPKIClient(cfg *PKIClientConfig) (*PKIClient, error) {
 		dbs.New(db, "katzenmint"),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Error initialization of katzenmint-pki light client: %v", err)
+		return nil, fmt.Errorf("error initialization of katzenmint-pki light client: %v", err)
 	}
 	provider, err := http.New(cfg.RPCAddress, "/websocket")
 	if err != nil {
-		return nil, fmt.Errorf("Error connection to katzenmint-pki full node: %v", err)
+		return nil, fmt.Errorf("error connection to katzenmint-pki full node: %v", err)
 	}
 	kpFunc := lightrpc.KeyPathFn(func(_ string, key []byte) (merkle.KeyPath, error) {
 		kp := merkle.KeyPath{}

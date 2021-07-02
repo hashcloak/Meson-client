@@ -1,4 +1,4 @@
-// pkiclient.go - Caching PKI client.
+// caching pki client
 // Copyright (C) 2017  Yawning Angel.
 //
 // This program is free software: you can redistribute it and/or modify
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Package pkiclient implements a caching wrapper around core/pki.Client.
+// Package pkiclient implements a caching wrapper
 package pkiclient
 
 import (
@@ -42,12 +42,12 @@ type cacheEntry struct {
 	doc *pki.Document
 }
 
-// Client is a caching PKI client.
-type Client struct {
+// Cache is a caching PKI client.
+type Cache struct {
 	sync.Mutex
 	worker.Worker
 
-	impl pki.Client
+	impl Client
 	docs map[uint64]*list.Element
 	lru  list.List
 
@@ -61,7 +61,7 @@ type fetchOp struct {
 }
 
 // Halt tears down the Client instance.
-func (c *Client) Halt() {
+func (c *Cache) Halt() {
 	c.Worker.Halt()
 
 	// Clean out c.fetchQueue.
@@ -75,8 +75,13 @@ func (c *Client) Halt() {
 	}
 }
 
-// Get returns the PKI document for the provided epoch.
-func (c *Client) Get(ctx context.Context, epoch uint64) (*pki.Document, []byte, error) {
+// GetEpoch returns the epoch information of PKI.
+func (c *Cache) GetEpoch(ctx context.Context) (epoch uint64, startHeight int64, err error) {
+	return c.impl.GetEpoch(ctx)
+}
+
+// GetDoc returns the PKI document for the provided epoch.
+func (c *Cache) GetDoc(ctx context.Context, epoch uint64) (*pki.Document, []byte, error) {
 	// Fast path, cache hit.
 	if d := c.cacheGet(epoch); d != nil {
 		return d.doc, d.raw, nil
@@ -101,16 +106,16 @@ func (c *Client) Get(ctx context.Context, epoch uint64) (*pki.Document, []byte, 
 }
 
 // Post posts the node's descriptor to the PKI for the provided epoch.
-func (c *Client) Post(ctx context.Context, epoch uint64, signingKey *eddsa.PrivateKey, d *pki.MixDescriptor) error {
+func (c *Cache) Post(ctx context.Context, epoch uint64, signingKey *eddsa.PrivateKey, d *pki.MixDescriptor) error {
 	return errNotSupported
 }
 
 // Deserialize returns PKI document given the raw bytes.
-func (c *Client) Deserialize(raw []byte) (*pki.Document, error) {
+func (c *Cache) Deserialize(raw []byte) (*pki.Document, error) {
 	return c.impl.Deserialize(raw) // I hope impl.Deserialize is re-entrant.
 }
 
-func (c *Client) cacheGet(epoch uint64) *cacheEntry {
+func (c *Cache) cacheGet(epoch uint64) *cacheEntry {
 	c.Lock()
 	defer c.Unlock()
 
@@ -121,7 +126,7 @@ func (c *Client) cacheGet(epoch uint64) *cacheEntry {
 	return nil
 }
 
-func (c *Client) insertLRU(newEntry *cacheEntry) {
+func (c *Cache) insertLRU(newEntry *cacheEntry) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -138,7 +143,7 @@ func (c *Client) insertLRU(newEntry *cacheEntry) {
 	}
 }
 
-func (c *Client) worker() {
+func (c *Cache) worker() {
 	for {
 		var op *fetchOp
 		select {
@@ -158,7 +163,7 @@ func (c *Client) worker() {
 		//
 		// TODO: This could allow concurrent fetches at some point, but for
 		// most common client use cases, this shouldn't matter much.
-		d, raw, err := c.impl.Get(op.ctx, op.epoch)
+		d, raw, err := c.impl.GetDoc(op.ctx, op.epoch)
 		if err != nil {
 			op.doneCh <- err
 			continue
@@ -170,8 +175,8 @@ func (c *Client) worker() {
 }
 
 // New constructs a new Client backed by an existing pki.Client instance.
-func New(impl pki.Client) *Client {
-	c := new(Client)
+func NewCacheClient(impl Client) *Cache {
+	c := new(Cache)
 	c.impl = impl
 	c.docs = make(map[uint64]*list.Element)
 	c.fetchQueue = make(chan *fetchOp, fetchBacklog)

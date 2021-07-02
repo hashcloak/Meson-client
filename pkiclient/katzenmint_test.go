@@ -1,4 +1,4 @@
-package minclient
+package pkiclient
 
 import (
 	"bytes"
@@ -191,7 +191,7 @@ func TestMockPKIClientGetDocument(t *testing.T) {
 	require.Equal(e, epoch)
 
 	// test get document with pki client
-	doc, _, err := pkiClient.Get(context.Background(), epoch)
+	doc, _, err := pkiClient.GetDoc(context.Background(), epoch)
 	require.NoError(err)
 	require.Equal(doc, testDoc)
 }

@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	kpki "github.com/hashcloak/Meson-client/pkiclient"
 	"github.com/katzenpost/core/crypto/ecdh"
 	"github.com/katzenpost/core/crypto/eddsa"
 	"github.com/katzenpost/core/crypto/rand"
@@ -55,7 +56,7 @@ type ClientConfig struct {
 	LogBackend *log.Backend
 
 	// PKIClient is the PKI Document data source.
-	PKIClient cpki.Client
+	PKIClient kpki.Client
 
 	// OnConnFn is the callback function that will be called when the
 	// connection status changes.  The error parameter will be nil on

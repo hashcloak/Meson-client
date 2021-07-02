@@ -1,6 +1,6 @@
 // +build integration
 
-package minclient
+package pkiclient
 
 import (
 	"context"
@@ -111,12 +111,12 @@ func TestGetDocument(t *testing.T) {
 	err = rpcclient.WaitForHeight(abciClient, resp.Height+1, nil)
 	require.NoError(err)
 
-	doc, _, err := pkiClient.Get(context.Background(), epoch)
+	doc, _, err := pkiClient.GetDoc(context.Background(), epoch)
 	require.NoError(err)
 	assert.Equal(docTest, doc, "Got an incorrect document")
 
 	// Try getting a non-existing document
-	_, _, err = pkiClient.Get(context.Background(), epoch+1)
+	_, _, err = pkiClient.GetDoc(context.Background(), epoch+1)
 	assert.NotNil(err, "Got a document that should not exist")
 }
 

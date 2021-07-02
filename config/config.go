@@ -26,10 +26,10 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/hashcloak/Meson-client/internal/proxy"
-	"github.com/hashcloak/Meson-client/minclient"
+	kpki "github.com/hashcloak/Meson-client/pkiclient"
 	"github.com/katzenpost/core/crypto/eddsa"
 	"github.com/katzenpost/core/log"
-	"github.com/katzenpost/core/pki"
+	cpki "github.com/katzenpost/core/pki"
 	registration "github.com/katzenpost/registration_client"
 	"github.com/tendermint/tendermint/light"
 	"golang.org/x/net/idna"
@@ -99,7 +99,7 @@ type Debug struct {
 
 	// PreferedTransports is a list of the transports will be used to make
 	// outgoing network connections, with the most prefered first.
-	PreferedTransports []pki.Transport
+	PreferedTransports []cpki.Transport
 }
 
 func (d *Debug) fixup() {
@@ -140,10 +140,10 @@ func (tcCfg *TendermintClient) validate() error {
 	return nil
 }
 
-// NewPKIClient returns a katzenmint implementation of pki.Client or error
-func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (pki.Client, error) {
+// NewPKIClient returns a katzenmint implementation of pkiclient or error
+func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (kpki.Client, error) {
 	//! Proxy unused, should we add it somewhere?
-	cfg := &minclient.PKIClientConfig{
+	cfg := &kpki.PKIClientConfig{
 		LogBackend:         l,
 		ChainID:            "TODO: chainID_of_katzenmint_pki",
 		TrustOptions:       c.TendermintClient.TrustOptions,
@@ -153,7 +153,7 @@ func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (pki.Client, e
 		DatabaseDir:        c.TendermintClient.DatabaseDir,
 		RPCAddress:         c.TendermintClient.RPCAddress,
 	}
-	return minclient.NewPKIClient(cfg)
+	return kpki.NewPKIClient(cfg)
 }
 
 // Reunion is the Reunion configuration needed by clients
