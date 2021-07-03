@@ -1,5 +1,3 @@
-// +build integration
-
 package pkiclient
 
 import (
@@ -83,7 +81,8 @@ func TestGetDocument(t *testing.T) {
 	require.NoError(err)
 
 	// Get the upcoming epoch
-	epoch := getEpoch(abciClient, require)
+	epoch, _, err := pkiClient.GetEpoch(context.Background())
+	require.NoError(err)
 	epoch += 1
 
 	// Create a document
