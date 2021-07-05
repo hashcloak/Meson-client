@@ -11,7 +11,7 @@ import (
 // Client is the abstract interface used for PKI interaction.
 type Client interface {
 	// GetEpoch returns the epoch information of PKI.
-	GetEpoch(ctx context.Context) (epoch uint64, startHeight int64, err error)
+	GetEpoch(ctx context.Context) (epoch uint64, ellapsedHeight uint64, err error)
 
 	// GetDoc returns the PKI document along with the raw serialized form for the provided epoch.
 	GetDoc(ctx context.Context, epoch uint64) (*cpki.Document, []byte, error)

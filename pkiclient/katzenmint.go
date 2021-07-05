@@ -67,7 +67,7 @@ func (p *PKIClient) query(ctx context.Context, epoch uint64, command kpki.Comman
 }
 
 // GetEpoch returns the epoch information of PKI.
-func (p *PKIClient) GetEpoch(ctx context.Context) (epoch uint64, startHeight int64, err error) {
+func (p *PKIClient) GetEpoch(ctx context.Context) (epoch uint64, ellapsedHeight uint64, err error) {
 	resp, err := p.query(ctx, 0, kpki.GetEpoch)
 	if err != nil {
 		return
@@ -81,7 +81,12 @@ func (p *PKIClient) GetEpoch(ctx context.Context) (epoch uint64, startHeight int
 		return
 	}
 	epoch, _ = binary.Uvarint(resp.Response.Value[:8])
-	startHeight, _ = binary.Varint(resp.Response.Value[8:16])
+	startingHeight, _ := binary.Varint(resp.Response.Value[8:16])
+	if startingHeight > resp.Response.Height {
+		err = fmt.Errorf("retrieved starting height is more than the corresponding block height")
+		return
+	}
+	ellapsedHeight = uint64(resp.Response.Height - startingHeight)
 	return
 }
 

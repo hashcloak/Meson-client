@@ -10,6 +10,15 @@ import (
 //! The duration of a katzenmint epoch. Should refer to katzenmint PKI.
 var TestPeriod = 20 * time.Minute
 
-func Now(client kpki.Client) (epoch uint64, startHeight int64, err error) {
-	return client.GetEpoch(context.Background())
+//! Number of heights across an epoch. Should refer to katzenmint PKI.
+var testEpochInterval uint64 = 5
+
+func Now(client kpki.Client) (epoch uint64, ellapsed, till time.Duration, err error) {
+	epoch, ellapsedHeight, err := client.GetEpoch(context.Background())
+	if ellapsedHeight > uint64(testEpochInterval) {
+		ellapsedHeight = uint64(testEpochInterval)
+	}
+	ellapsed = time.Duration(uint64(TestPeriod) * ellapsedHeight / testEpochInterval)
+	till = TestPeriod - ellapsed
+	return
 }

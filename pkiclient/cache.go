@@ -76,7 +76,7 @@ func (c *Cache) Halt() {
 }
 
 // GetEpoch returns the epoch information of PKI.
-func (c *Cache) GetEpoch(ctx context.Context) (epoch uint64, startHeight int64, err error) {
+func (c *Cache) GetEpoch(ctx context.Context) (epoch uint64, ellapsedHeight uint64, err error) {
 	return c.impl.GetEpoch(ctx)
 }
 
