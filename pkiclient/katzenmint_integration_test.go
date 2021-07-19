@@ -16,7 +16,6 @@ import (
 	"github.com/katzenpost/core/crypto/rand"
 	katlog "github.com/katzenpost/core/log"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	log "github.com/tendermint/tendermint/libs/log"
@@ -37,10 +36,8 @@ func newDiscardLogger() (logger log.Logger) {
 	return
 }
 
-// TestGetDocument tests the functionality of Meson universe
-func TestGetDocument(t *testing.T) {
+func testCreateClient(t *testing.T, dbname string) *PKIClient {
 	var (
-		assert     = assert.New(t)
 		require    = require.New(t)
 		config     = rpctest.GetConfig()
 		chainID    = config.ChainID()
@@ -74,11 +71,21 @@ func TestGetDocument(t *testing.T) {
 		TrustOptions:       trustOptions,
 		PrimaryAddress:     rpcAddress,
 		WitnessesAddresses: []string{rpcAddress},
-		DatabaseName:       "pkiclient_db",
+		DatabaseName:       dbname,
 		DatabaseDir:        testDir,
 		RPCAddress:         rpcAddress,
 	})
 	require.NoError(err)
+
+	return pkiClient
+}
+
+// TestGetDocument tests the functionality of Meson universe
+func TestGetDocument(t *testing.T) {
+	var (
+		require   = require.New(t)
+		pkiClient = testCreateClient(t, "integration_test1")
+	)
 
 	// Get the upcoming epoch
 	epoch, _, err := pkiClient.GetEpoch(context.Background())
@@ -112,11 +119,28 @@ func TestGetDocument(t *testing.T) {
 
 	doc, _, err := pkiClient.GetDoc(context.Background(), epoch)
 	require.NoError(err)
-	assert.Equal(docTest, doc, "Got an incorrect document")
+	require.Equal(docTest, doc, "Got an incorrect document")
 
 	// Try getting a non-existing document
 	_, _, err = pkiClient.GetDoc(context.Background(), epoch+1)
-	assert.NotNil(err, "Got a document that should not exist")
+	require.NotNil(err, "Got a document that should not exist")
+}
+
+func TestPostDescriptor(t *testing.T) {
+	var (
+		require   = require.New(t)
+		pkiClient = testCreateClient(t, "integration_test2")
+	)
+
+	// Get the upcoming epoch
+	epoch, _, err := pkiClient.GetEpoch(context.Background())
+	require.NoError(err)
+	epoch += 1
+
+	// Post test descriptor
+	desc, _, privKey := testutil.CreateTestDescriptor(require, 0, 0, epoch)
+	err = pkiClient.Post(context.Background(), epoch, &privKey, desc)
+	require.NoError(err)
 }
 
 // TestMain tests the katzenmint-pki
