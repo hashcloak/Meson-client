@@ -131,33 +131,24 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 	if err != nil {
 		return err
 	}
-	p.log.Debugf("Signed descriptor: '%v'", signed)
 
 	// Form the abci transaction
-	rawTx := kpki.Transaction{
-		Version: "1",
+	tx := kpki.Transaction{
+		Version: kpki.ProtocolVersion,
 		Epoch:   epoch,
 		Command: kpki.PublishMixDescriptor,
 		Payload: kpki.EncodeHex(signed),
 	}
-	// ! Problemsome here
-	rawTx.AppendSignature(ed25519.PrivateKey(signingKey.Bytes()))
-	tx, err := kpki.EncodeJson(rawTx)
-	if err != nil {
-		return err
-	}
-	p.log.Debugf("Transaction: '%v'", tx)
+	tx.AppendSignature(ed25519.PrivateKey(signingKey.Bytes()))
 
-	// Broadcast the abci transaction
-	resp, err := p.light.BroadcastTxSync(ctx, tx)
+	// Post the transaction
+	_, err = p.PostTx(ctx, tx)
 	if err != nil {
 		return err
 	}
-	if resp.Code != 0 {
-		return fmt.Errorf("broadcast Tx returned with status code: %v", resp.Code)
-	}
+	return nil
+
 	// TODO: Make sure to subscribe for events
-
 	// Parse the post_descriptor_status command.
 	/*
 		r, ok := resp.(*commands.PostDescriptorStatus)
@@ -173,7 +164,6 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 			return fmt.Errorf("nonvoting/client: Post() rejected by authority: %v", postErrorToString(r.ErrorCode))
 		}
 	*/
-	return nil
 }
 
 // PostTx posts the transaction to the katzenmint node.
@@ -188,7 +178,6 @@ func (p *PKIClient) PostTx(ctx context.Context, tx kpki.Transaction) (*ctypes.Re
 	if err != nil {
 		return nil, err
 	}
-	p.log.Debugf("Transaction: '%v'", tx)
 
 	// Broadcast the abci transaction
 	resp, err := p.light.BroadcastTxCommit(ctx, encTx)
