@@ -185,10 +185,10 @@ func (p *PKIClient) PostTx(ctx context.Context, tx kpki.Transaction) (*ctypes.Re
 		return resp, err
 	}
 	if !resp.CheckTx.IsOK() {
-		return resp, fmt.Errorf("send transaction failed at checking tx")
+		return resp, fmt.Errorf("send transaction failed at checking tx: %v", resp.CheckTx.Log)
 	}
 	if !resp.DeliverTx.IsOK() {
-		return resp, fmt.Errorf("send transaction failed at delivering tx")
+		return resp, fmt.Errorf("send transaction failed at delivering tx: %v", resp.DeliverTx.Log)
 	}
 	return resp, nil
 }
