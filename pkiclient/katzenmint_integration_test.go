@@ -87,10 +87,9 @@ func TestGetDocument(t *testing.T) {
 		pkiClient = testCreateClient(t, "integration_test1")
 	)
 
-	// Get the upcoming epoch
+	// Get the current epoch
 	epoch, _, err := pkiClient.GetEpoch(context.Background())
 	require.NoError(err)
-	epoch += 1
 
 	// Create a document
 	_, docSer := testutil.CreateTestDocument(require, epoch)
