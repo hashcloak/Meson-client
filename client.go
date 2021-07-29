@@ -3,20 +3,113 @@
 package client
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	mrand "math/rand"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/hashcloak/Meson-client/config"
+	"github.com/hashcloak/Meson-client/pkiclient/epochtime"
 	"github.com/hashcloak/Meson-plugin/pkg/common"
-	katzenClient "github.com/katzenpost/client"
-	"github.com/katzenpost/client/config"
+	kClient "github.com/katzenpost/client"
 	"github.com/katzenpost/core/crypto/ecdh"
+	"github.com/katzenpost/core/crypto/rand"
 	"github.com/katzenpost/core/log"
+	"github.com/katzenpost/core/pki"
+	registration "github.com/katzenpost/registration_client"
 	"gopkg.in/op/go-logging.v1"
 )
 
+const (
+	initialPKIConsensusTimeout = 45 * time.Second
+)
+
+func AutoRegisterRandomClient(cfg *config.Config) (*config.Config, *ecdh.PrivateKey) {
+	// Retrieve a copy of the PKI consensus document.
+	logFilePath := ""
+	backendLog, err := log.New(logFilePath, "DEBUG", false)
+	if err != nil {
+		panic(err)
+	}
+	proxyCfg := cfg.UpstreamProxyConfig()
+	pkiClient, err := cfg.NewPKIClient(backendLog, proxyCfg)
+	if err != nil {
+		panic(err)
+	}
+	currentEpoch, _, _, err := epochtime.Now(pkiClient)
+	if err != nil {
+		panic(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), initialPKIConsensusTimeout)
+	defer cancel()
+	doc, _, err := pkiClient.GetDoc(ctx, currentEpoch)
+	if err != nil {
+		panic(err)
+	}
+
+	// Pick a registration Provider.
+	registerProviders := []*pki.MixDescriptor{}
+	for _, provider := range doc.Providers {
+		if provider.RegistrationHTTPAddresses != nil {
+			registerProviders = append(registerProviders, provider)
+		}
+	}
+	if len(registerProviders) == 0 {
+		panic("zero registration Providers found in the consensus")
+	}
+	mrand.Seed(time.Now().UTC().UnixNano())
+	registrationProvider := registerProviders[mrand.Intn(len(registerProviders))]
+
+	// Register with that Provider.
+	fmt.Println("registering client with mixnet Provider")
+	linkKey, err := ecdh.NewKeypair(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	account := &config.Account{
+		User:           fmt.Sprintf("%x", linkKey.PublicKey().Bytes()),
+		Provider:       registrationProvider.Name,
+		ProviderKeyPin: registrationProvider.IdentityKey,
+	}
+
+	u, err := url.Parse(registrationProvider.RegistrationHTTPAddresses[0])
+	if err != nil {
+		panic(err)
+	}
+	cfgRegistration := &config.Registration{
+		Address: u.Host,
+		Options: &registration.Options{
+			Scheme:       u.Scheme,
+			UseSocks:     strings.HasPrefix(cfg.UpstreamProxy.Type, "socks"),
+			SocksNetwork: cfg.UpstreamProxy.Network,
+			SocksAddress: cfg.UpstreamProxy.Address,
+		},
+	}
+	cfg.Account = account
+	cfg.Registration = cfgRegistration
+	err = RegisterClient(cfg, linkKey.PublicKey())
+	if err != nil {
+		panic(err)
+	}
+	return cfg, linkKey
+}
+
+func RegisterClient(cfg *config.Config, linkKey *ecdh.PublicKey) error {
+	client, err := registration.New(cfg.Registration.Address, cfg.Registration.Options)
+	if err != nil {
+		return err
+	}
+	err = client.RegisterAccountWithLinkKey(cfg.Account.User, linkKey)
+	return err
+}
+
 type Client struct {
-	*katzenClient.Client
+	*kClient.Client
 
 	cfg        *config.Config
 	logBackend *log.Backend
@@ -24,7 +117,7 @@ type Client struct {
 	fatalErrCh chan error
 	haltedCh   chan interface{}
 	haltOnce   *sync.Once
-	session    *katzenClient.Session
+	session    *kClient.Session
 	linkKey    *ecdh.PrivateKey
 	service    string
 }
@@ -36,7 +129,7 @@ type Client struct {
 func (c *Client) Start() error {
 	var err error
 	// Retrieve PKI consensus documents and related info
-	_, c.linkKey = katzenClient.AutoRegisterRandomClient(c.cfg)
+	_, c.linkKey = AutoRegisterRandomClient(c.cfg)
 	c.session, err = c.NewSession(c.linkKey)
 	return err
 }
@@ -93,13 +186,13 @@ func New(cfgFile string, service string) (*Client, error) {
 		return nil, err
 	}
 
-	katzen, err := katzenClient.New(cfg)
-	if err != nil {
-		return nil, err
-	}
+	// katzen, err := kClient.New(cfg)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	client := &Client{
-		Client:     katzen,
+		// Client:     katzen,
 		cfg:        cfg,
 		fatalErrCh: make(chan error),
 		haltedCh:   make(chan interface{}),

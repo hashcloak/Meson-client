@@ -26,7 +26,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/hashcloak/Meson-client/internal/proxy"
-	kpki "github.com/hashcloak/Meson-client/pkiclient"
+	mpki "github.com/hashcloak/Meson-client/pkiclient"
 	"github.com/katzenpost/core/crypto/eddsa"
 	"github.com/katzenpost/core/log"
 	cpki "github.com/katzenpost/core/pki"
@@ -114,8 +114,9 @@ func (d *Debug) fixup() {
 	}
 }
 
-// TendermintClient is a tendermint client configuration.
-type TendermintClient struct {
+// Katzenmint is a tendermint client configuration.
+type Katzenmint struct {
+	ChainID            string
 	TrustOptions       light.TrustOptions
 	PrimaryAddress     string
 	WitnessesAddresses []string
@@ -124,7 +125,7 @@ type TendermintClient struct {
 	RPCAddress         string
 }
 
-func (tcCfg *TendermintClient) validate() error {
+func (tcCfg *Katzenmint) validate() error {
 	if err := tcCfg.TrustOptions.ValidateBasic(); err != nil {
 		return err
 	}
@@ -141,19 +142,19 @@ func (tcCfg *TendermintClient) validate() error {
 }
 
 // NewPKIClient returns a katzenmint implementation of pkiclient or error
-func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (kpki.Client, error) {
+func (c *Config) NewPKIClient(l *log.Backend, pCfg *proxy.Config) (mpki.Client, error) {
 	//! Proxy unused, should we add it somewhere?
-	cfg := &kpki.PKIClientConfig{
+	cfg := &mpki.PKIClientConfig{
 		LogBackend:         l,
-		ChainID:            "TODO: chainID_of_katzenmint_pki",
-		TrustOptions:       c.TendermintClient.TrustOptions,
-		PrimaryAddress:     c.TendermintClient.PrimaryAddress,
-		WitnessesAddresses: c.TendermintClient.WitnessesAddresses,
-		DatabaseName:       c.TendermintClient.DatabaseName,
-		DatabaseDir:        c.TendermintClient.DatabaseDir,
-		RPCAddress:         c.TendermintClient.RPCAddress,
+		ChainID:            c.Katzenmint.ChainID,
+		TrustOptions:       c.Katzenmint.TrustOptions,
+		PrimaryAddress:     c.Katzenmint.PrimaryAddress,
+		WitnessesAddresses: c.Katzenmint.WitnessesAddresses,
+		DatabaseName:       c.Katzenmint.DatabaseName,
+		DatabaseDir:        c.Katzenmint.DatabaseDir,
+		RPCAddress:         c.Katzenmint.RPCAddress,
 	}
-	return kpki.NewPKIClient(cfg)
+	return mpki.NewPKIClient(cfg)
 }
 
 // Reunion is the Reunion configuration needed by clients
@@ -284,15 +285,15 @@ func (uCfg *UpstreamProxy) toProxyConfig() (*proxy.Config, error) {
 
 // Config is the top level client configuration.
 type Config struct {
-	Logging          *Logging
-	UpstreamProxy    *UpstreamProxy
-	Debug            *Debug
-	TendermintClient *TendermintClient
-	Account          *Account
-	Registration     *Registration
-	Panda            *Panda
-	Reunion          *Reunion
-	upstreamProxy    *proxy.Config
+	Logging       *Logging
+	UpstreamProxy *UpstreamProxy
+	Debug         *Debug
+	Katzenmint    *Katzenmint
+	Account       *Account
+	Registration  *Registration
+	Panda         *Panda
+	Reunion       *Reunion
+	upstreamProxy *proxy.Config
 }
 
 // UpstreamProxyConfig returns the configured upstream proxy, suitable for
@@ -326,8 +327,8 @@ func (c *Config) FixupAndMinimallyValidate() error {
 	} else {
 		return err
 	}
-	if err := c.TendermintClient.validate(); err != nil {
-		return fmt.Errorf("config: TendermintClient is invalid: %v", err)
+	if err := c.Katzenmint.validate(); err != nil {
+		return fmt.Errorf("config: Katzenmint is invalid: %v", err)
 	}
 
 	// Panda is optional
