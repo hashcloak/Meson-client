@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/katzenpost/core/epochtime"
+	"github.com/hashcloak/Meson-client/pkiclient/epochtime"
 	cpki "github.com/katzenpost/core/pki"
 	"github.com/katzenpost/core/worker"
 	"gopkg.in/op/go-logging.v1"
@@ -31,7 +31,8 @@ import (
 var (
 	errGetConsensusCanceled = errors.New("minclient/pki: consensus fetch canceled")
 	// errConsensusNotFound    = errors.New("minclient/pki: consensus not ready yet")
-	nextFetchTill   = epochtime.Period / 8
+	// TODO: should update period
+	nextFetchTill   = epochtime.TestPeriod / 8
 	recheckInterval = 1 * time.Minute
 	// WarpedEpoch is a build time flag that accelerates the recheckInterval
 	WarpedEpoch = "false"
@@ -94,7 +95,11 @@ func (p *pki) skewedUnixTime() int64 {
 }
 
 func (p *pki) currentDocument() *cpki.Document {
-	now, _, _ := epochtime.FromUnix(p.skewedUnixTime())
+	now, _, _, err := epochtime.Now(p.c.cfg.PKIClient)
+	if err != nil {
+		p.log.Debugf("Couldn't find epoch: %+v", err)
+		return nil
+	}
 	if d, _ := p.docs.Load(now); d != nil {
 		return d.(*cpki.Document)
 	}
@@ -127,7 +132,11 @@ func (p *pki) worker() {
 
 		// Use the skewed time to determine which documents to fetch.
 		epochs := make([]uint64, 0, 2)
-		now, _, till := epochtime.FromUnix(p.skewedUnixTime())
+		now, _, till, err := epochtime.Now(p.c.cfg.PKIClient)
+		if err != nil {
+			p.log.Debugf("Couldn't find epoch: %+v", err)
+			continue
+		}
 		epochs = append(epochs, now)
 		if till < nextFetchTill {
 			epochs = append(epochs, now+1)
