@@ -41,6 +41,9 @@ type PKIClient struct {
 	// cpki.Client
 	light *lightrpc.Client
 	log   *logging.Logger
+
+	// TODO: should care about cache client?
+	db dbm.DB
 }
 
 func (p *PKIClient) query(ctx context.Context, epoch uint64, command kpki.Command) (*ctypes.ResultABCIQuery, error) {
@@ -207,6 +210,7 @@ func NewPKIClient(cfg *PKIClientConfig) (*PKIClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error opening katzenmint-pki database: %v", err)
 	}
+	p.db = db
 	lightclient, err := light.NewHTTPClient(
 		context.Background(),
 		cfg.ChainID,
@@ -239,4 +243,10 @@ func NewPKIClientFromLightClient(light *lightrpc.Client, logBackend *log.Backend
 	p.light = light
 	p.light.RegisterOpDecoder(iavl.ProofOpIAVLValue, iavl.ValueOpDecoder)
 	return p, nil
+}
+
+// Shutdown the client
+func (p *PKIClient) Shutdown() {
+	p.light.OnStop()
+	p.db.Close()
 }

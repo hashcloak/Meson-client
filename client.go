@@ -41,6 +41,9 @@ func AutoRegisterRandomClient(cfg *config.Config) (*config.Config, *ecdh.Private
 	if err != nil {
 		panic(err)
 	}
+	// have to shutdown pkiclient and release database
+	// maybe find better solution?
+	defer pkiClient.Shutdown()
 	currentEpoch, _, _, err := epochtime.Now(pkiClient)
 	if err != nil {
 		panic(err)
@@ -117,7 +120,7 @@ type Client struct {
 	fatalErrCh chan error
 	haltedCh   chan interface{}
 	haltOnce   *sync.Once
-	session    *kClient.Session
+	session    *Session
 	linkKey    *ecdh.PrivateKey
 	service    string
 }
@@ -216,4 +219,15 @@ func New(cfgFile string, service string) (*Client, error) {
 	}()
 
 	return client, nil
+}
+
+// New establishes a session with provider using key.
+// This method will block until session is connected to the Provider.
+func (c *Client) NewSession(linkKey *ecdh.PrivateKey) (*Session, error) {
+	var err error
+	timeout := time.Duration(c.cfg.Debug.SessionDialTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	c.session, err = NewSession(ctx, c.fatalErrCh, c.logBackend, c.cfg, linkKey)
+	return c.session, err
 }

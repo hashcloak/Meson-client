@@ -85,18 +85,15 @@ func NewSession(
 	proxyCfg := cfg.UpstreamProxyConfig()
 	pkiClient, err := cfg.NewPKIClient(logBackend, proxyCfg)
 	if err != nil {
+		fmt.Println("GG1")
 		return nil, err
 	}
 
-	// create a pkiclient for minclient's use
-	pkiClient2, err := cfg.NewPKIClient(logBackend, proxyCfg)
-	if err != nil {
-		return nil, err
-	}
-	pkiCacheClient := kpki.NewCacheClient(pkiClient2)
+	// TODO: create a pkiclient for minclient's use
+	// can only open database once
+	pkiCacheClient := kpki.NewCacheClient(pkiClient)
 
 	clientLog := logBackend.GetLogger(fmt.Sprintf("%s@%s_client", cfg.Account.User, cfg.Account.Provider))
-
 	s := &Session{
 		cfg:         cfg,
 		linkKey:     linkKey,
@@ -108,6 +105,7 @@ func NewSession(
 		opCh:        make(chan workerOp, 8),
 		egressQueue: new(Queue),
 	}
+
 	// Configure and bring up the minclient instance.
 	clientCfg := &minclient.ClientConfig{
 		User:                cfg.Account.User,

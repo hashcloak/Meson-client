@@ -21,4 +21,7 @@ type Client interface {
 
 	// Deserialize returns PKI document given the raw bytes.
 	Deserialize(raw []byte) (*cpki.Document, error)
+
+	// Shutdown the client
+	Shutdown()
 }

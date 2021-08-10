@@ -184,3 +184,8 @@ func NewCacheClient(impl Client) *Cache {
 	c.Go(c.worker)
 	return c
 }
+
+// Shutdown the client
+func (c *Cache) Shutdown() {
+	c.Halt()
+}
