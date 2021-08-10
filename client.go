@@ -189,13 +189,35 @@ func New(cfgFile string, service string) (*Client, error) {
 		return nil, err
 	}
 
-	// katzen, err := kClient.New(cfg)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	client := &Client{
-		// Client:     katzen,
+		cfg:        cfg,
+		fatalErrCh: make(chan error),
+		haltedCh:   make(chan interface{}),
+		haltOnce:   new(sync.Once),
+		linkKey:    new(ecdh.PrivateKey),
+		service:    service,
+	}
+
+	if err := client.InitLogging(); err != nil {
+		return nil, err
+	}
+
+	// Start the fatal error watcher.
+	go func() {
+		err, ok := <-client.fatalErrCh
+		if !ok {
+			return
+		}
+		client.log.Warningf("Shutting down due to error: %v", err)
+		client.Shutdown()
+	}()
+
+	return client, nil
+}
+
+// New instantiates a new Meson client with the provided configuration
+func NewFromConfig(cfg *config.Config, service string) (*Client, error) {
+	client := &Client{
 		cfg:        cfg,
 		fatalErrCh: make(chan error),
 		haltedCh:   make(chan interface{}),
