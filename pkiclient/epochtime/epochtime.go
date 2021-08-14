@@ -20,5 +20,8 @@ func Now(client kpki.Client) (epoch uint64, ellapsed, till time.Duration, err er
 	}
 	ellapsed = time.Duration(uint64(TestPeriod) * ellapsedHeight / testEpochInterval)
 	till = TestPeriod - ellapsed
+	// epoch should minus 1
+	// TODO: find a better way for this
+	epoch -= 1
 	return
 }
