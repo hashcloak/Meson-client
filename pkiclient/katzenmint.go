@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/cosmos/iavl"
@@ -76,7 +77,7 @@ func (p *PKIClient) GetEpoch(ctx context.Context) (epoch uint64, ellapsedHeight 
 		return
 	}
 	if resp.Response.Code != 0 {
-		err = fmt.Errorf(resp.Response.Log)
+		err = errors.New(resp.Response.Log)
 		return
 	}
 	if len(resp.Response.Value) != 16 {
@@ -103,7 +104,10 @@ func (p *PKIClient) GetDoc(ctx context.Context, epoch uint64) (*cpki.Document, [
 		return nil, nil, err
 	}
 	if resp.Response.Code != 0 {
-		return nil, nil, cpki.ErrNoDocument
+		if resp.Response.Code == 0x5 { //! Warning: MAGIC error code
+			return nil, nil, cpki.ErrNoDocument
+		}
+		return nil, nil, fmt.Errorf(resp.Response.Log)
 	}
 
 	// Verify and parse the document

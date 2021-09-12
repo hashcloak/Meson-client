@@ -7,7 +7,7 @@ require (
 	github.com/cosmos/iavl v0.15.3
 	github.com/ethereum/go-ethereum v1.9.10
 	github.com/hashcloak/Meson-plugin v0.0.0-20200208012317-7f72000d5e7b
-	github.com/hashcloak/katzenmint-pki v0.0.0-20210719175511-517f11c769a0
+	github.com/hashcloak/katzenmint-pki v0.0.0-20210912125049-04a77cadca70
 	github.com/katzenpost/client v0.0.3
 	github.com/katzenpost/core v0.0.12
 	github.com/katzenpost/noise v0.0.2 // indirect
