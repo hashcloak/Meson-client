@@ -26,8 +26,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hashcloak/Meson-client/pkiclient/epochtime"
 	"github.com/katzenpost/core/crypto/rand"
-	"github.com/katzenpost/core/epochtime"
 	cpki "github.com/katzenpost/core/pki"
 	"github.com/katzenpost/core/wire"
 	"github.com/katzenpost/core/wire/commands"
@@ -196,7 +196,7 @@ func (c *connection) connectWorker() {
 		// Wait for a signal from the PKI (or a fallback timer to pass)
 		// before querying the PKI for a document iff we do not have the
 		// Provider's current descriptor.
-		if now, _, _ := epochtime.FromUnix(c.c.pki.skewedUnixTime()); now != c.pkiEpoch {
+		if now, _, _, _ := epochtime.Now(c.c.cfg.PKIClient); now != c.pkiEpoch {
 			select {
 			case <-c.HaltCh():
 				return

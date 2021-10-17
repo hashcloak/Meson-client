@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashcloak/Meson-client/pkiclient/epochtime"
 	"github.com/katzenpost/core/constants"
 	"github.com/katzenpost/core/crypto/rand"
-	"github.com/katzenpost/core/epochtime"
 	cpki "github.com/katzenpost/core/pki"
 	"github.com/katzenpost/core/sphinx"
 	sConstants "github.com/katzenpost/core/sphinx/constants"
@@ -49,20 +49,23 @@ func (c *Client) ComposeSphinxPacket(recipient, provider string, surbID *[sConst
 
 	for {
 		unixTime := c.pki.skewedUnixTime()
-		_, _, budget := epochtime.FromUnix(unixTime)
+		epoch, _, budget, err := epochtime.Now(c.cfg.PKIClient)
+		if err != nil {
+			return nil, nil, 0, err
+		}
 		start := time.Now()
 
 		// Select the forward path.
 		now := time.Unix(unixTime, 0)
 
-		fwdPath, then, err := c.makePath(recipient, provider, surbID, now, true)
+		fwdPath, then, err := c.makePath(recipient, provider, surbID, now, true, epoch)
 		if err != nil {
 			return nil, nil, 0, err
 		}
 
 		revPath := make([]*sphinx.PathHop, 0)
 		if surbID != nil {
-			revPath, then, err = c.makePath(c.cfg.User, provider, surbID, then, false)
+			revPath, then, err = c.makePath(c.cfg.User, provider, surbID, then, false, epoch)
 			if err != nil {
 				return nil, nil, 0, err
 			}
@@ -77,7 +80,7 @@ func (c *Client) ComposeSphinxPacket(recipient, provider string, surbID *[sConst
 		// It is possible, but unlikely that a series of delays exceeding
 		// the PKI publication imposted limitations will be selected.  When
 		// that happens, the path selection must be redone.
-		if then.Sub(now) < epochtime.Period*2 {
+		if then.Sub(now) < epochtime.TestPeriod*2 {
 			if surbID != nil {
 				payload := make([]byte, 2, 2+sphinx.SURBLength+len(b))
 				payload[0] = 1 // Packet has a SURB.
@@ -127,7 +130,7 @@ func (c *Client) SendCiphertext(recipient, provider string, surbID *[sConstants.
 	return k, rtt, err
 }
 
-func (c *Client) makePath(recipient, provider string, surbID *[sConstants.SURBIDLength]byte, baseTime time.Time, isForward bool) ([]*sphinx.PathHop, time.Time, error) {
+func (c *Client) makePath(recipient, provider string, surbID *[sConstants.SURBIDLength]byte, baseTime time.Time, isForward bool, epoch uint64) ([]*sphinx.PathHop, time.Time, error) {
 	srcProvider, dstProvider := c.cfg.Provider, provider
 	if !isForward {
 		srcProvider, dstProvider = dstProvider, srcProvider
@@ -149,7 +152,7 @@ func (c *Client) makePath(recipient, provider string, surbID *[sConstants.SURBID
 		return nil, time.Time{}, fmt.Errorf("minclient: failed to find destination Provider: %v", err)
 	}
 
-	p, t, err := path.New(c.rng, doc, []byte(recipient), src, dst, surbID, baseTime, true, isForward)
+	p, t, err := NewPath(c.rng, doc, []byte(recipient), src, dst, surbID, baseTime, true, isForward, epoch)
 	if err == nil {
 		_ = c.logPath(doc, p)
 	}

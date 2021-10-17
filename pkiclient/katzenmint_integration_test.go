@@ -11,6 +11,7 @@ import (
 	"time"
 
 	kpki "github.com/hashcloak/katzenmint-pki"
+	"github.com/hashcloak/katzenmint-pki/config"
 	"github.com/hashcloak/katzenmint-pki/s11n"
 	"github.com/hashcloak/katzenmint-pki/testutil"
 	"github.com/katzenpost/core/crypto/rand"
@@ -153,9 +154,10 @@ func TestMain(m *testing.M) {
 	}
 
 	// start katzenmint node in the background to test against
+	kcfg := config.DefaultConfig()
 	db := dbm.NewMemDB()
 	logger := newDiscardLogger()
-	app := kpki.NewKatzenmintApplication(db, logger)
+	app := kpki.NewKatzenmintApplication(kcfg, db, logger)
 	node := rpctest.StartTendermint(app, rpctest.SuppressStdout)
 	abciClient = local.New(node)
 
