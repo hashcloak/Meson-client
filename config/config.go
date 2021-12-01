@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/mail"
+	"os"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -404,4 +405,14 @@ func LoadFile(f string) (*Config, error) {
 		return nil, err
 	}
 	return Load(b)
+}
+
+func (c *Config) SaveConfig(fileName string) error {
+	f, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	enc := toml.NewEncoder(f)
+	return enc.Encode(c)
 }
