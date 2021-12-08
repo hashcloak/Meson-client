@@ -3,7 +3,6 @@ package pkiclient
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"encoding/binary"
 	"fmt"
 	"path/filepath"
@@ -13,7 +12,6 @@ import (
 	"github.com/hashcloak/katzenmint-pki/s11n"
 	"github.com/hashcloak/katzenmint-pki/testutil"
 
-	"github.com/katzenpost/core/crypto/rand"
 	katlog "github.com/katzenpost/core/log"
 
 	"github.com/stretchr/testify/mock"
@@ -203,22 +201,9 @@ func TestMockPKIClientPostTx(t *testing.T) {
 		epoch   uint64 = 1
 	)
 
-	// create a test document
-	_, docSer := testutil.CreateTestDocument(require, epoch)
-	testDoc, err := s11n.VerifyAndParseDocument(docSer)
-	require.NoError(err)
-	require.NotNil(testDoc)
-
-	rawTx := kpki.Transaction{
-		Version: kpki.ProtocolVersion,
-		Epoch:   epoch,
-		Command: kpki.AddConsensusDocument,
-		Payload: string(docSer),
-	}
-	_, privKey, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(err)
-	rawTx.AppendSignature(privKey)
-	tx, err := kpki.EncodeJson(rawTx)
+	// create a test descriptor
+	desc, signed, privKey := testutil.CreateTestDescriptor(require, 0, 0, epoch)
+	tx, err := kpki.FormTransaction(kpki.PublishMixDescriptor, epoch, kpki.EncodeHex(signed), &privKey)
 	require.NoError(err)
 
 	// moke the abci broadcast commit
@@ -230,30 +215,39 @@ func TestMockPKIClientPostTx(t *testing.T) {
 		"BroadcastTxCommit",
 		context.Background(),
 		tmtx,
-	).Return(&ctypes.ResultBroadcastTxCommit{
-		CheckTx:   abci.ResponseCheckTx{Code: 0, GasWanted: 1},
-		DeliverTx: abci.ResponseDeliverTx{Code: 0},
-	}, nil)
+	).Run(
+		func(args mock.Arguments) {
+			parsed, err := s11n.ParseDescriptorWithoutVerify(signed)
+			require.NoError(err)
+			require.Equal(desc.IdentityKey, parsed.IdentityKey)
+			require.Equal(desc.LinkKey, parsed.LinkKey)
+		},
+	).Return(
+		&ctypes.ResultBroadcastTxCommit{
+			CheckTx:   abci.ResponseCheckTx{Code: 0, GasWanted: 1},
+			DeliverTx: abci.ResponseDeliverTx{Code: 0},
+		},
+		nil,
+	)
 
-	// initialize pki client with light client
+	// initialize light client
 	lc := &lcmock.LightClient{}
 	require.NoError(err)
-
 	c := lightrpc.NewClient(next, lc,
 		lightrpc.KeyPathFn(func(_ string, key []byte) (merkle.KeyPath, error) {
 			kp := merkle.KeyPath{}
 			return kp, nil
 		}))
-
 	logPath := filepath.Join(testDir, "pkiclient_log")
 	logBackend, err := katlog.New(logPath, "INFO", true)
 	require.NoError(err)
 
+	// initialize pki client
 	pkiClient, err := NewPKIClientFromLightClient(c, logBackend)
 	require.NoError(err)
 	require.NotNil(pkiClient)
 
-	_, err = pkiClient.PostTx(context.Background(), rawTx)
+	_, err = pkiClient.PostTx(context.Background(), tx)
 	require.NoError(err)
 }
 

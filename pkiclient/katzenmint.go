@@ -4,7 +4,6 @@ package pkiclient
 
 import (
 	"context"
-	"crypto/ed25519"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -140,15 +139,12 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 	}
 
 	// Form the abci transaction
-	tx := kpki.Transaction{
-		Version: kpki.ProtocolVersion,
-		Epoch:   epoch,
-		Command: kpki.PublishMixDescriptor,
-		Payload: kpki.EncodeHex(signed),
+	tx, err := kpki.FormTransaction(kpki.PublishMixDescriptor, epoch, kpki.EncodeHex(signed), signingKey)
+	if err != nil {
+		return err
 	}
-	tx.AppendSignature(ed25519.PrivateKey(signingKey.Bytes()))
 
-	// Post the transaction
+	// Post the abci transaction
 	_, err = p.PostTx(ctx, tx)
 	if err != nil {
 		return err
@@ -174,28 +170,18 @@ func (p *PKIClient) Post(ctx context.Context, epoch uint64, signingKey *eddsa.Pr
 }
 
 // PostTx posts the transaction to the katzenmint node.
-func (p *PKIClient) PostTx(ctx context.Context, tx kpki.Transaction) (*ctypes.ResultBroadcastTxCommit, error) {
-	p.log.Debugf("PostTx(ctx, %d)", tx.Epoch)
+func (p *PKIClient) PostTx(ctx context.Context, tx []byte) (*ctypes.ResultBroadcastTxCommit, error) {
 
-	if !tx.IsVerified() {
-		return nil, fmt.Errorf("transaction is not verified, did you forget signing?")
-	}
-
-	encTx, err := kpki.EncodeJson(tx)
+	// Broadcast the abci transaction
+	resp, err := p.light.BroadcastTxCommit(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-
-	// Broadcast the abci transaction
-	resp, err := p.light.BroadcastTxCommit(ctx, encTx)
-	if err != nil {
-		return resp, err
-	}
 	if !resp.CheckTx.IsOK() {
-		return resp, fmt.Errorf("send transaction failed at checking tx: %v", resp.CheckTx.Log)
+		return nil, fmt.Errorf("send transaction failed at checking tx: %v", resp.CheckTx.Log)
 	}
 	if !resp.DeliverTx.IsOK() {
-		return resp, fmt.Errorf("send transaction failed at delivering tx: %v", resp.DeliverTx.Log)
+		return nil, fmt.Errorf("send transaction failed at delivering tx: %v", resp.DeliverTx.Log)
 	}
 	return resp, nil
 }
