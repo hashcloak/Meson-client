@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	client "github.com/hashcloak/Meson-client"
+	"github.com/hashcloak/Meson-client/config"
 	currencyConfig "github.com/hashcloak/Meson-plugin/pkg/config"
 )
 
@@ -158,7 +159,11 @@ func main() {
 		panic("ERROR Signing raw transaction: " + err.Error())
 	}
 
-	client, err := client.New(*clientToml, *testSuite.ticker)
+	clientCfg, err := config.LoadFile(*clientToml)
+	if err != nil {
+		panic("ERROR In loading client config: " + err.Error())
+	}
+	client, err := client.New(clientCfg, *testSuite.ticker)
 	if err != nil {
 		panic("ERROR In creating new client: " + err.Error())
 	}

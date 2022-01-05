@@ -29,7 +29,7 @@ const (
 	initialPKIConsensusTimeout = 45 * time.Second
 )
 
-func AutoRegisterRandomClient(cfg *config.Config) (*config.Config, *ecdh.PrivateKey) {
+func AutoRegisterRandomClient(cfg *config.Config) *ecdh.PrivateKey {
 	// Retrieve a copy of the PKI consensus document.
 	logFilePath := ""
 	backendLog, err := log.New(logFilePath, "DEBUG", false)
@@ -99,7 +99,7 @@ func AutoRegisterRandomClient(cfg *config.Config) (*config.Config, *ecdh.Private
 	if err != nil {
 		panic(err)
 	}
-	return cfg, linkKey
+	return linkKey
 }
 
 func RegisterClient(cfg *config.Config, linkKey *ecdh.PublicKey) error {
@@ -132,7 +132,7 @@ type Client struct {
 func (c *Client) Start() error {
 	var err error
 	// Retrieve PKI consensus documents and related info
-	_, c.linkKey = AutoRegisterRandomClient(c.cfg)
+	c.linkKey = AutoRegisterRandomClient(c.cfg)
 	c.session, err = c.NewSession(c.linkKey)
 	return err
 }
@@ -183,12 +183,7 @@ func (c *Client) InitLogging() error {
 // New instantiates a new Meson client with the provided configuration file
 // and service that represents the chain it's being used for.
 // It returns a Client struct pointer and any errors encountered.
-func New(cfgFile string, service string) (*Client, error) {
-	cfg, err := config.LoadFile(cfgFile)
-	if err != nil {
-		return nil, err
-	}
-
+func New(cfg *config.Config, service string) (*Client, error) {
 	client := &Client{
 		cfg:        cfg,
 		fatalErrCh: make(chan error),
