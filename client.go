@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	mrand "math/rand"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -31,8 +33,12 @@ const (
 
 func AutoRegisterRandomClient(cfg *config.Config) *ecdh.PrivateKey {
 	// Retrieve a copy of the PKI consensus document.
-	logFilePath := ""
-	backendLog, err := log.New(logFilePath, "DEBUG", false)
+	logFile, err := ioutil.TempFile("", "meson-client-registration-log")
+	if err != nil {
+		panic(err)
+	}
+	defer os.Remove(logFile.Name())
+	backendLog, err := log.New(logFile.Name(), "ERROR", false)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +75,7 @@ func AutoRegisterRandomClient(cfg *config.Config) *ecdh.PrivateKey {
 	registrationProvider := registerProviders[mrand.Intn(len(registerProviders))]
 
 	// Register with that Provider.
-	fmt.Println("registering client with mixnet Provider")
+	// "registering client with mixnet Provider"
 	linkKey, err := ecdh.NewKeypair(rand.Reader)
 	if err != nil {
 		panic(err)
