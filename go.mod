@@ -12,7 +12,6 @@ require (
 	github.com/katzenpost/core v0.0.12
 	github.com/katzenpost/noise v0.0.2 // indirect
 	github.com/katzenpost/registration_client v0.0.1
-	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/stretchr/testify v1.7.0

@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/katzenpost/core/crypto/eddsa"
 	"github.com/katzenpost/core/pki"
@@ -33,8 +34,9 @@ var (
 	errNotSupported = errors.New("pkiclient: operation not supported")
 	errHalted       = errors.New("pkiclient: client was halted")
 
-	fetchBacklog = 8
-	lruMaxSize   = 8
+	fetchBacklog          = 8
+	lruMaxSize            = 8
+	epochRetrieveInterval = 3 * time.Second
 )
 
 type cacheEntry struct {
@@ -50,6 +52,10 @@ type Cache struct {
 	impl Client
 	docs map[uint64]*list.Element
 	lru  list.List
+
+	timer     *time.Timer
+	memEpoch  uint64
+	memHeight uint64
 
 	fetchQueue chan *fetchOp
 }
@@ -77,7 +83,20 @@ func (c *Cache) Halt() {
 
 // GetEpoch returns the epoch information of PKI.
 func (c *Cache) GetEpoch(ctx context.Context) (epoch uint64, ellapsedHeight uint64, err error) {
-	return c.impl.GetEpoch(ctx)
+	select {
+	case <-c.timer.C:
+		epoch, ellapsedHeight, err = c.impl.GetEpoch(ctx)
+		if err == nil {
+			c.memEpoch = epoch
+			c.memHeight = ellapsedHeight
+			c.timer.Reset(epochRetrieveInterval)
+		} else {
+			c.timer.Reset(0)
+		}
+	default:
+		return c.memEpoch, c.memHeight, nil
+	}
+	return
 }
 
 // GetDoc returns the PKI document for the provided epoch.
@@ -144,6 +163,8 @@ func (c *Cache) insertLRU(newEntry *cacheEntry) {
 }
 
 func (c *Cache) worker() {
+	c.timer = time.NewTimer(0)
+	defer c.timer.Stop()
 	for {
 		var op *fetchOp
 		select {

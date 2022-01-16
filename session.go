@@ -97,7 +97,7 @@ func NewSession(
 	s := &Session{
 		cfg:         cfg,
 		linkKey:     linkKey,
-		pkiClient:   pkiClient,
+		pkiClient:   pkiCacheClient,
 		log:         clientLog,
 		fatalErrCh:  fatalErrCh,
 		eventCh:     channels.NewInfiniteChannel(),
