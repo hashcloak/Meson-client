@@ -18,7 +18,6 @@ import (
 
 	"github.com/hashcloak/Meson-client/config"
 	"github.com/hashcloak/Meson-client/pkiclient/epochtime"
-	"github.com/hashcloak/Meson-plugin/pkg/common"
 	"github.com/katzenpost/core/crypto/ecdh"
 	"github.com/katzenpost/core/crypto/rand"
 	"github.com/katzenpost/core/log"
@@ -139,29 +138,6 @@ func (c *Client) Start() error {
 	c.linkKey = AutoRegisterRandomClient(c.cfg)
 	c.session, err = c.NewSession(c.linkKey)
 	return err
-}
-
-// SendRawTransaction takes a signed transaction blob, a destination blockchain
-// along with its ticker symbol and sends that blob to a provider that will
-// send the blob to the right blockchain.
-// It returns a reply and any error encountered.
-
-// Note: This is subject to change as we add more support for other blockchains
-func (c *Client) SendRawTransaction(rawTransactionBlob *string, ticker *string) ([]byte, error) {
-	req := common.NewRequest(*ticker, *rawTransactionBlob)
-	mesonRequest := req.ToJson()
-
-	mesonService, err := c.session.GetService(c.service)
-	if err != nil {
-		return nil, err
-	}
-
-	reply, err := c.session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	return reply, nil
 }
 
 // InitLogging provides logging for the meson client
