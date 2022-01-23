@@ -49,9 +49,9 @@ var (
 		Timeout:   connectTimeout,
 	}
 
-	keepAliveInterval   = 3 * time.Minute
-	connectTimeout      = 1 * time.Minute
-	pkiFallbackInterval = 3 * time.Minute
+	keepAliveInterval = 3 * time.Minute
+	connectTimeout    = 1 * time.Minute
+	pkiFlushInterval  = 3 * time.Minute
 )
 
 // TODO: replace panic code with other error code or recover pattern?
@@ -188,43 +188,28 @@ func (c *connection) connectWorker() {
 		}
 	}()
 
-	timer := time.NewTimer(pkiFallbackInterval)
+	timer := time.NewTimer(0)
 	defer timer.Stop()
 	for {
-		var timerFired bool
-
-		// Wait for a signal from the PKI (or a fallback timer to pass)
-		// before querying the PKI for a document iff we do not have the
-		// Provider's current descriptor.
-		if now, _, _, _ := epochtime.Now(c.c.cfg.PKIClient); now != c.pkiEpoch {
-			select {
-			case <-c.HaltCh():
-				return
-			case <-c.pkiFetchCh:
-				c.log.Debugf("PKI fetch successful.")
-			case <-timer.C:
-				c.log.Debugf("PKI fetch fallback timer.")
-				timerFired = true
-			}
-		}
-		if !timerFired && !timer.Stop() {
-			<-timer.C
-		}
-
-		// Query the PKI for the current descriptor.
-		if err := c.getDescriptor(); err == nil {
-			// Attempt to connect.
-			c.doConnect(dialCtx)
-		} else if c.c.cfg.OnConnFn != nil {
-			// Can't connect due to lacking descriptor.
-			c.c.cfg.OnConnFn(err)
-		}
+		// Wait pki flush time
 		select {
 		case <-c.HaltCh():
 			return
-		default:
+		case <-timer.C:
+			timer.Reset(pkiFlushInterval)
 		}
-		timer.Reset(pkiFallbackInterval)
+
+		// Only need to update PKI when seeing a new epoch
+		if now, _, _, _ := epochtime.Now(c.c.cfg.PKIClient); now != c.pkiEpoch {
+			// Query the PKI for the current descriptor.
+			if err := c.getDescriptor(); err == nil {
+				// Attempt to connect.
+				c.doConnect(dialCtx)
+			} else if c.c.cfg.OnConnFn != nil {
+				// Can't connect due to lacking descriptor.
+				c.c.cfg.OnConnFn(err)
+			}
+		}
 	}
 
 	// NOTREACHED
@@ -232,8 +217,8 @@ func (c *connection) connectWorker() {
 
 func (c *connection) doConnect(dialCtx context.Context) {
 	const (
-		retryIncrement = 15 * time.Second
-		maxRetryDelay  = 2 * time.Minute
+		retryIncrement = 2 * time.Second
+		maxRetryDelay  = 5 * time.Second
 	)
 
 	dialFn := c.c.cfg.DialContextFn
@@ -324,7 +309,7 @@ func (c *connection) doConnect(dialCtx context.Context) {
 }
 
 func (c *connection) onTCPConn(conn net.Conn) {
-	const handshakeTimeout = 1 * time.Minute
+	const handshakeTimeout = 10 * time.Second
 	var err error
 
 	defer func() {
@@ -705,8 +690,8 @@ func newConnection(c *Client) *connection {
 
 func init() {
 	if WarpedEpoch == "true" {
-		keepAliveInterval = 30 * time.Second
-		connectTimeout = 10 * time.Second
-		pkiFallbackInterval = 30 * time.Second
+		keepAliveInterval = 10 * time.Second
+		connectTimeout = 3 * time.Second
+		pkiFlushInterval = 3 * time.Second
 	}
 }

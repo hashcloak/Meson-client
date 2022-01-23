@@ -237,6 +237,6 @@ func NewPKIClientFromLightClient(light *lightrpc.Client, logBackend *log.Backend
 
 // Shutdown the client
 func (p *PKIClient) Shutdown() {
-	p.light.OnStop()
-	p.db.Close()
+	_ = p.light.Stop()
+	_ = p.db.Close()
 }

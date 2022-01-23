@@ -4,6 +4,7 @@ package client
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -17,8 +18,6 @@ import (
 
 	"github.com/hashcloak/Meson-client/config"
 	"github.com/hashcloak/Meson-client/pkiclient/epochtime"
-	"github.com/hashcloak/Meson-plugin/pkg/common"
-	kClient "github.com/katzenpost/client"
 	"github.com/katzenpost/core/crypto/ecdh"
 	"github.com/katzenpost/core/crypto/rand"
 	"github.com/katzenpost/core/log"
@@ -28,7 +27,7 @@ import (
 )
 
 const (
-	initialPKIConsensusTimeout = 45 * time.Second
+	initialPKIConsensusTimeout = 10 * time.Second
 )
 
 func AutoRegisterRandomClient(cfg *config.Config) *ecdh.PrivateKey {
@@ -118,8 +117,6 @@ func RegisterClient(cfg *config.Config, linkKey *ecdh.PublicKey) error {
 }
 
 type Client struct {
-	*kClient.Client
-
 	cfg        *config.Config
 	logBackend *log.Backend
 	log        *logging.Logger
@@ -143,31 +140,6 @@ func (c *Client) Start() error {
 	return err
 }
 
-// SendRawTransaction takes a signed transaction blob, a destination blockchain
-// along with its ticker symbol and sends that blob to a provider that will
-// send the blob to the right blockchain.
-// It returns a reply and any error encountered.
-
-// Note: This is subject to change as we add more support for other blockchains
-func (c *Client) SendRawTransaction(rawTransactionBlob *string, ticker *string) ([]byte, error) {
-	defer c.Shutdown()
-
-	req := common.NewRequest(*ticker, *rawTransactionBlob)
-	mesonRequest := req.ToJson()
-
-	mesonService, err := c.session.GetService(c.service)
-	if err != nil {
-		return nil, err
-	}
-
-	reply, err := c.session.BlockingSendUnreliableMessage(mesonService.Name, mesonService.Provider, mesonRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	return reply, nil
-}
-
 // InitLogging provides logging for the meson client
 // It returns any errors it encounters.
 func (c *Client) InitLogging() error {
@@ -184,6 +156,34 @@ func (c *Client) InitLogging() error {
 		c.log = c.logBackend.GetLogger("hashcloak/Meson-client")
 	}
 	return err
+}
+
+func (c *Client) GetBackendLog() *log.Backend {
+	return c.logBackend
+}
+
+// GetLogger returns a new logger with the given name.
+func (c *Client) GetLogger(name string) *logging.Logger {
+	return c.logBackend.GetLogger(name)
+}
+
+// Shutdown cleanly shuts down a given Client instance.
+func (c *Client) Shutdown() {
+	c.haltOnce.Do(func() { c.halt() })
+}
+
+// Wait waits till the Client is terminated for any reason.
+func (c *Client) Wait() {
+	<-c.haltedCh
+}
+
+func (c *Client) halt() {
+	c.log.Noticef("Starting graceful shutdown.")
+	if c.session != nil {
+		c.session.Shutdown()
+	}
+	close(c.fatalErrCh)
+	close(c.haltedCh)
 }
 
 // New instantiates a new Meson client with the provided configuration file
@@ -253,4 +253,12 @@ func (c *Client) NewSession(linkKey *ecdh.PrivateKey) (*Session, error) {
 	defer cancel()
 	c.session, err = NewSession(ctx, c.fatalErrCh, c.logBackend, c.cfg, linkKey)
 	return c.session, err
+}
+
+func ValidateReply(reply []byte) ([]byte, error) {
+	realLen := int(binary.BigEndian.Uint32(reply[:4]))
+	if len(reply) < realLen+4 {
+		return nil, fmt.Errorf("reply len error")
+	}
+	return reply[4:], nil
 }

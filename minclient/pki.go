@@ -32,10 +32,9 @@ var (
 	errGetConsensusCanceled = errors.New("minclient/pki: consensus fetch canceled")
 	// errConsensusNotFound    = errors.New("minclient/pki: consensus not ready yet")
 	// TODO: should update period
-	nextFetchTill   = epochtime.TestPeriod / 8
-	recheckInterval = 1 * time.Minute
+	recheckInterval = 10 * time.Second
 	// WarpedEpoch is a build time flag that accelerates the recheckInterval
-	WarpedEpoch = "false"
+	WarpedEpoch = "true"
 )
 
 type pki struct {
@@ -50,6 +49,7 @@ type pki struct {
 	clockSkew     int64
 
 	forceUpdateCh chan interface{}
+	doneWorkerCh  chan interface{}
 }
 
 // ClockSkew returns the current best guess difference between the client's
@@ -103,11 +103,16 @@ func (p *pki) currentDocument() *cpki.Document {
 	if d, _ := p.docs.Load(now); d != nil {
 		return d.(*cpki.Document)
 	}
+	p.forceUpdateCh <- true
+	<-p.doneWorkerCh
+	if d, _ := p.docs.Load(now); d != nil {
+		return d.(*cpki.Document)
+	}
 	return nil
 }
 
 func (p *pki) worker() {
-	const initialSpawnDelay = 5 * time.Second
+	const initialSpawnDelay = 3 * time.Second
 
 	timer := time.NewTimer(initialSpawnDelay)
 	defer func() {
@@ -121,6 +126,7 @@ func (p *pki) worker() {
 		select {
 		case <-p.HaltCh():
 			p.log.Debugf("Terminating gracefully.")
+			close(p.doneWorkerCh)
 			return
 		case <-p.forceUpdateCh:
 		case <-timer.C:
@@ -130,17 +136,13 @@ func (p *pki) worker() {
 			<-timer.C
 		}
 
-		// Use the skewed time to determine which documents to fetch.
-		epochs := make([]uint64, 0, 2)
-		now, _, till, err := epochtime.Now(p.c.cfg.PKIClient)
+		// Determine which documents to fetch.
+		now, _, _, err := epochtime.Now(p.c.cfg.PKIClient)
 		if err != nil {
 			p.log.Debugf("Couldn't find epoch: %+v", err)
 			continue
 		}
-		epochs = append(epochs, now)
-		if till < nextFetchTill {
-			epochs = append(epochs, now+1)
-		}
+		epochs := []uint64{now - 1, now}
 
 		// Fetch the documents that we are missing.
 		didUpdate := false
@@ -192,7 +194,11 @@ func (p *pki) worker() {
 				p.c.cfg.OnDocumentFn(d.(*cpki.Document))
 			}
 		}
-
+		select {
+		case <-p.doneWorkerCh:
+		default:
+		}
+		p.doneWorkerCh <- true
 		timer.Reset(recheckInterval)
 	}
 
@@ -244,11 +250,12 @@ func newPKI(c *Client) *pki {
 	p.log = c.cfg.LogBackend.GetLogger("minclient/pki:" + c.displayName)
 	p.failedFetches = make(map[uint64]error)
 	p.forceUpdateCh = make(chan interface{}, 1)
+	p.doneWorkerCh = make(chan interface{}, 1)
 	return p
 }
 
 func init() {
 	if WarpedEpoch == "true" {
-		recheckInterval = 5 * time.Second
+		recheckInterval = 3 * time.Second
 	}
 }
