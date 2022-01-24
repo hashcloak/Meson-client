@@ -1,5 +1,5 @@
 # Meson-client
-[![Build Status](https://travis-ci.com/hashcloak/Meson-client.svg?branch=master)](https://travis-ci.com/hashcloak/Meson-client)
+[![Go](https://github.com/hashcloak/Meson-client/actions/workflows/go.yml/badge.svg)](https://github.com/hashcloak/Meson-client/actions/workflows/go.yml)
 
 A simple client for use with the Meson mixnet software
 
